@@ -1,0 +1,9 @@
+courseID,courseName,SCHOOL_YEAR,HOME_GROUP,timePeriodID,TEACHER,TEACHER_B
+ART,Art,ALL,ALL,,TEACH01,
+PE,Physical Education,5,ALL,2021FY,TEACH02,
+PE,Physical Education,4,ALL,,TEACH03,
+PE,Physical Education,3,03B,2021FY,TEACH04,
+PE,Physical Education,2,,2021FY,TEACH05,
+PE,Physical Education,1,ALL,21FY,TEACH06,
+PE,Physical Education,0,ALL,[YEAR]FY,TEACH07,
+PE,Physical Education,,6A,[YEAR]FY,TEACH08,

@@ -1,0 +1,1 @@
+﻿Invoke-WebRequest "http://disco:9292/API/Job/CommentPost/4095?comment=This+is+a+pain+in+the+ass+2%0A%0Aasd" -UseDefaultCredentials
