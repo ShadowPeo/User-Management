@@ -279,6 +279,12 @@ ForEach ($User in $Users)
             updateADValue "Description" "Description" $USER.HOME_GROUP
         }
 
+        #Change Prep/Foundation to Numerical (00) if enabled and the grade starts with 0F
+        if ($numericalPrep -eq $true -and ($User.HOME_GROUP).ToUpper() -match '0F[A-Z]' )
+        {
+            $User.HOME_GROUP = $User.HOME_GROUP -replace '0F', '00'
+        }
+
         ##Office to Homegroup
         updateADValue "Office" "physicalDeliveryOfficeName" $User.HOME_GROUP
         
