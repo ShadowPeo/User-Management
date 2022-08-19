@@ -1,7 +1,8 @@
 ﻿$edvalsFilestoProcess = @(
-("C:\Input\Edvals\Sem 1,2","2022","FY"),
-("C:\Input\Edvals\Sem 1","2022","S01")<#,
-("C:\Input\Edvals\Sem 2","2022","S02")#>)
+("$PSScriptRoot\Input\Edvals\Sem 1,2","2022","FY"),
+("$PSScriptRoot\Input\Edvals\Sem 1","2022","S01")
+<#,("$PSScriptRoot\Input\Edvals\Sem 2","2022","S02")#>
+)
 
 function Read-edvalsData
 {
