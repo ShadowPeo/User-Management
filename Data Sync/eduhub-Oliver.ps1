@@ -67,10 +67,10 @@ $sScriptVersion = "1.0"
 $fileConfig = $null #Null or Blank for ignore, any other value and the script will attempt import
 
 #School Details
-$schoolID = "schoolno" # Used for export and for import if using CASES File Names
+$schoolID = "3432" # Used for export and for import if using CASES File Names
 #$schoolID = [system.environment]::MachineName.Trim().Substring(0,4)
 
-$schoolEmailDomain = "schooldom" #Only used if processing emails or users from CASES Data
+$schoolEmailDomain = "mwps.vic.edu.au" #Only used if processing emails or users from CASES Data
 
 #File Settings
 $modifiedHeaders = $false #Use Modified Export Headers (from export script in this Repo), if not it will look for standard eduHub headers
@@ -93,22 +93,22 @@ $handlingStudentExitAfter = 365 #How long to export the data after the staff mem
 $handlingStaffExitAfter = 365 #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left staff, -1 will always export them
 $handlingFileYearLevel = 1 # 1 = Static (use the one from cache, if not exist cache copy and us as literal) 2 = Use Literal, description will e exported exactly as is. 3 = Pad the year numbers (if they exist) in the description field
 $handlingIncludeFutures = $true #Include Future Students
-$handlingStudentEmail = 1 #1 = Use eduHub Email, 2 = Calculate from eduHub Data (STKEY/SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP)
-$handlingStaffEmail = 1 #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SFKEY/SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from AD, fall back to SFKEY, 7 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub Data, fall back to SFKEY
-$handlingStudentUsername = 1 #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (STKEY/SIS_ID), 2 = Calculate from eduHub Data (STKEY/SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName
-$handlingStaffUsername = 1 #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SFKEY/SIS_ID), 2 = Calculate from eduHub Data (SFKEY/SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName, 6 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from AD, fall back to SFKEY, 7 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub Data, fall back to SFKEY
-$handlingStudentAlias = 4 #1 = SFKEY, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to STKEY
-$handlingStaffAlias = 4 #1 = SFKEY, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SFKEY, 4 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub Data - Fall back to SFKEY
-$handlingValidateLicencing = $true #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled
-$handlingCreateNonEduhub = $true #Create accounts for users where licencing is explicitly enabled but not in eduHub data samAccountName becomes Alias other attributes handled as per settings (where available) or defaults
+$handlingStudentEmail = 1 #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP)
+$handlingStaffEmail = 1 #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
+$handlingStudentUsername = 1 #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName
+$handlingStaffUsername = 1 #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName, 6 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
+$handlingStudentAlias = 1 #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID
+$handlingStaffAlias = 3 #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
+$handlingValidateLicencing = $false #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled
+$handlingCreateNonEduhub = $false #Create accounts for users where licencing is explicitly enabled but not in eduHub data samAccountName becomes Alias other attributes handled as per settings (where available) or defaults
 $handlingLicencingValue = "licencingOliver" #The attribute name for the licencing Data
 $handlingADStaffType = "employeeType" #The attribute name for stating whether its a staff user or not for imports, only important if $handlingCreateNonEduhub is true, needs to be "Staff" or "15" (as in UserCreator) otherwise will assume student
 $handlingExportNoUser = $true #Export user if there is no matching username in AD, if AD lookup is in use
 
-#Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SFKEY/STKEY) or in the case of staff members PAYROLL_REC_NO Matches will also be based upon email matching UPN
+#Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SIS_ID) or in the case of staff members PAYROLL_REC_NO Matches will also be based upon email matching UPN
 $runAsLoggedIn = $true
 $activeDirectoryUser = $null #Username to connect to AD as, will prompt for password if credentials do not exist or are incorrect, not used if not running as logged in user
-$activeDirectoryServer = $null #DNS Name or IP of AD Server
+$activeDirectoryServer = "10.124.228.137" #DNS Name or IP of AD Server
 
 #Log File Info
 $sLogPath = "C:\Windows\Temp"
@@ -169,7 +169,8 @@ Function Merge-User
         [Parameter(Mandatory=$true)]$handlingEmail,
         [Parameter(Mandatory=$true)]$handlingUsername,
         [Parameter(Mandatory=$true)]$handlingAlias,
-        [Parameter(Mandatory=$true)][boolean]$handlingNoUser
+        [Parameter(Mandatory=$true)][boolean]$handlingNoUser,
+        [switch]$userStaff = $false
     )
   
   Begin{
@@ -179,21 +180,14 @@ Function Merge-User
   Process{
     Try
     {
-        #Set whether this is a staff or student user
-        $userStaff = $false
-        if ($null -eq $workingUser.SFKEY)
-        {
-            $userStaff = $true
-        }
-
         #If user is marked as left, run exit check
-        if ($workingUser.STATUS -eq "LEFT" -or $workingUser.STAFF_STATUS -eq "LEFT")
+        if ($workingUser.STATUS -eq "LEFT")
         {
             #Handle Exited Users if they are not meant to be exported, return null, else continue
             if ($exitAfter -gt 1)
             {
                 #check if current date is more than $exitAfter days after the users exited date
-                if((-not $userStaff -and (($currentDate - (Get-Date $workingUser.EXIT_DATE)).Days) -gt $exitAfter) -or ($userStaff -and (($currentDate - (Get-Date $workingUser.FINISH)).Days) -gt $exitAfter))
+                if(((($currentDate - (Get-Date $workingUser.EXIT_DATE)).Days) -gt $exitAfter))
                 {
                     return $null
                 }
@@ -202,33 +196,28 @@ Function Merge-User
             {
                 return $null
             }
+        } 
+        elseif ($workingUser.STATUS -eq "INAC")
+        {
+            return $null
         }
-
-        #Email Handling
-
-        switch ($handlingEmail)
+        
+       #Email Handling
+       switch ($handlingEmail)
         {
             #1 = Use eduHub Email
             1 
                 {
                     #Do nothing, using eduHub Email
                 }
-            #2 = Calculate from eduHub Data (STKEY/SIS_ID)@domain
+            #2 = Calculate from eduHub Data (SIS_ID)@domain
             2   {
                     if ([string]::IsNullOrWhiteSpace($schoolEmailDomain))
                     {
                         Write-Host "Email Domain Blank but told to use in settings, exiting"
                         exit
                     }
-
-                    if (-not $userStaff)
-                    {
-                        $workingUser.E_MAIL = "$(($workingUser.STKEY).ToLower())@$schoolEmailDomain"
-                    }
-                    else
-                    {
-                        $workingUser.E_MAIL = "$(($workingUser.SFKEY).ToLower())@$schoolEmailDomain"
-                    }
+                    $workingUser.E_MAIL = "$(($workingUser.SIS_ID).ToLower())@$schoolEmailDomain"
                 }
             #3 = pull from Active Directory UPN
             3   {
@@ -242,11 +231,11 @@ Function Merge-User
             5   {
                     
                 }
-            #6 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from Active Directory, fall back to SFKEY
+            #6 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from Active Directory, fall back to SIS_ID
             6   {
                     
                 }
-            #7 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub, fall back to SFKEY
+            #7 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub, fall back to SIS_ID
             {7 -and $userStaff -eq $true}
 
                 {
@@ -256,7 +245,7 @@ Function Merge-User
                     }
                     else
                     {
-                        $workingUser.E_MAIL = "$(($workingUser.SFKEY).ToLower())@$schoolEmailDomain"
+                        $workingUser.E_MAIL = "$(($workingUser.SIS_ID).ToLower())@$schoolEmailDomain"
                     }
                 }
             #default = Use eduHub Email
@@ -267,7 +256,6 @@ Function Merge-User
         }
 
         #Username Handling
-
         switch ($handlingUsername)
         {
             #-1 = Excluded Column on Export
@@ -285,16 +273,9 @@ Function Merge-User
             #1 = Use eduHub Key
             1 
                 {
-                    if (-not $userStaff)
-                    {
-                        $workingUser.USERNAME = ($workingUser.STKEY).ToUpper()
-                    }
-                    else
-                    {
-                        $workingUser.USERNAME = ($workingUser.SFKEY).ToUpper()
-                    }
+                   $workingUser.USERNAME = ($workingUser.SIS_ID).ToUpper()
                 }
-            #2 = Calculate from eduHub Data (STKEY/SIS_ID)@domain
+            #2 = Calculate from eduHub Data (SIS_ID)@domain
             2   {
                     if ([string]::IsNullOrWhiteSpace($schoolEmailDomain))
                     {
@@ -302,14 +283,8 @@ Function Merge-User
                         exit
                     }
 
-                    if (-not $userStaff)
-                    {
-                        $workingUser.USERNAME = "$(($workingUser.STKEY).ToLower())@$schoolEmailDomain"
-                    }
-                    else
-                    {
-                        $workingUser.USERNAME = "$(($workingUser.SFKEY).ToLower())@$schoolEmailDomain"
-                    }
+                    $workingUser.USERNAME = "$(($workingUser.SIS_ID).ToLower())@$schoolEmailDomain"
+
                 }
             #3 = pull from Active Directory UPN
             3   {
@@ -323,11 +298,11 @@ Function Merge-User
             5   {
                     
                 }
-            #6 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from Active Directory, fall back to SFKEY
+            #6 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from Active Directory, fall back to SIS_ID
             6   {
                     
                 }
-            #7 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub, fall back to SFKEY
+            #7 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub, fall back to SIS_ID
             {7 -and $userStaff -eq $true}
 
                 {
@@ -337,19 +312,19 @@ Function Merge-User
                     }
                     else
                     {
-                        $workingUser.USERNAME = $workingUser.SFKEY
+                        $workingUser.USERNAME = $workingUser.SIS_ID
                     }
                 }
-            #Default = Use eduHub Key (STKEY/SFKEY)
+            #Default = Use eduHub Key (SIS_ID)
             default 
                 {
                     if (-not $userStaff)
                     {
-                        $workingUser.USERNAME = ($workingUser.STKEY).ToUpper()
+                        $workingUser.USERNAME = ($workingUser.SIS_ID).ToUpper()
                     }
                     else
                     {
-                        $workingUser.USERNAME = ($workingUser.SFKEY).ToUpper()
+                        $workingUser.USERNAME = ($workingUser.SIS_ID).ToUpper()
                     }
                 }
         }
@@ -359,16 +334,16 @@ Function Merge-User
         switch ($handlingAlias)
         {
 
-            #1 = Use eduHub Key (STKEY/SFKEY)
+            #1 = Use eduHub Key (SIS_ID)
             1 
                 {
                     if (-not $userStaff)
                     {
-                        $workingUser.ALIAS = ($workingUser.STKEY).ToUpper()
+                        $workingUser.ALIAS = ($workingUser.SIS_ID).ToUpper()
                     }
                     else
                     {
-                        $workingUser.ALIAS = ($workingUser.SFKEY).ToUpper()
+                        $workingUser.ALIAS = ($workingUser.SIS_ID).ToUpper()
                     }
                 }
             #2 = Use samAccountName from Active Directory
@@ -389,23 +364,22 @@ Function Merge-User
                     }
                     else
                     {
-                        $workingUser.ALIAS = $workingUser.SFKEY
+                        $workingUser.ALIAS = $workingUser.SIS_ID
                     }
                 }
-            #Default = Use eduHub Key (STKEY/SFKEY)
+            #Default = Use eduHub Key (SIS_ID)
             default 
                 {
                     if (-not $userStaff)
                     {
-                        $workingUser.ALIAS = ($workingUser.STKEY).ToUpper()
+                        $workingUser.ALIAS = ($workingUser.SIS_ID).ToUpper()
                     }
                     else
                     {
-                        $workingUser.ALIAS = ($workingUser.SFKEY).ToUpper()
+                        $workingUser.ALIAS = ($workingUser.SIS_ID).ToUpper()
                     }
                 }
         }
-
 
         return $workingUser
 
@@ -432,14 +406,72 @@ Function Merge-User
 #Script Execution goes here
 #Log-Finish -LogPath $sLogFile
 
-if ($runAsLoggedIn -eq $false)
-{
-    Import-Module "$PSScriptRoot\Modules\Authentication.ps1"
-    $schoolServiceCreds = Get-SavedCredentials_WithRequest "$PSScriptRoot\Credentials\schoolDC-$([Environment]::MachineName)-$([Environment]::UserName).crd" $activeDirectoryUser
-    $schoolServiceCreds = new-object -typename System.Management.Automation.PSCredential -argumentlist $schoolServiceCreds.Username,$schoolServiceCreds.Password
-    $userCredentails = $null
-}
+###################### Import Config File If Specified ######################
+#Importing the Config file will overwrite the defaults with the config data, including blank and null values, if its declared it will be overwritten
+try 
+    {
+        Import-Module $fileConfig
+    }
+    catch
+    {
+        Write-Host "Cannot Load Config File, Exiting"
+        exit
+    }
 
+###################### Retrieve AD Users if Reqired ######################
+
+$handlingLicencingValue = "licencingOliver" #The attribute name for the licencing Data
+$handlingADStaffType = "employeeType" #The attribute name for stating whether its a staff user or not for imports, only important if $handlingCreateNonEduhub is true, needs to be "Staff" or "15" (as in UserCreator) otherwise will assume student
+$ADUsers = $null
+
+if ($handlingValidateLicencing -or $handlingCreateNonEduhub -or (($handlingStudentEmail -ge 3) -and ($handlingStudentEmail -le 5)) -or (($handlingStudentUsername -ge 3) -and ($handlingStudentUsername -le 5)) -or (($handlingStudentAlias -ge 2) -and ($handlingStudentAlias -le 3)) -or (($handlingStaffEmail -ge 3) -and ($handlingStaffEmail -le 6)) -or (($handlingStaffUsername -ge 3) -and ($handlingStaffUsername -le 6)) -or (($handlingStaffAlias -ge 2) -and ($handlingStaffAlias -le 3)))
+{
+    try 
+    {
+        Import-Module ActiveDirectory
+    }
+    catch
+    {
+        throw "Cannot Load Active Directory Module"
+    }
+    if ([string]::IsNullOrWhiteSpace($activeDirectoryServer))
+    {
+        Write-Host "Active Directory use is required, but no server is specfied"
+        exit
+    }
+    if ([string]::IsNullOrWhiteSpace($activeDirectoryUser) -and $runAsLoggedIn -eq $false)
+    {
+        Write-Host "Active Directory use is required, but no credentials are specfied and running as logged in user is disabled"
+        exit
+    }
+
+    try 
+    {
+        if ($runAsLoggedIn -eq $true)
+        {
+            $ADUsers = Get-ADUser -Server $activeDirectoryServer -Properties employeeID -SearchBase "OU=Users,OU=Western Port Secondary College,DC=Curric,DC=Western-Port-SC,DC=wan" -Filter * | Sort-Object employeeID
+        }
+        if ($runAsLoggedIn -eq $false)
+        {
+            try
+            {
+                Import-Module "$PSScriptRoot\Modules\Authentication.ps1"
+            }
+            catch
+            {
+                throw "Cannot Import Authentication Module"
+            }
+            $schoolServiceCreds = Get-SavedCredentials_WithRequest "$PSScriptRoot\Credentials\schoolDC-$([Environment]::MachineName)-$([Environment]::UserName).crd" $activeDirectoryUser
+            $schoolServiceCreds = new-object -typename System.Management.Automation.PSCredential -argumentlist $schoolServiceCreds.Username,$schoolServiceCreds.Password
+            $ADUsers = Get-ADUser -Server $activeDirectoryServer -Properties employeeID -SearchBase "OU=Users,OU=Western Port Secondary College,DC=Curric,DC=Western-Port-SC,DC=wan" -Filter * -Credential $schoolServiceCreds | Sort-Object employeeID
+        }
+    }
+    catch 
+    {
+        {1:<#Do this if a terminating exception happens#>}
+    }
+
+}
 
 ######################Import and Process Students######################
 
@@ -454,20 +486,20 @@ $currentDate = Get-Date
 if ($includeDeltas -eq $true -and $modifiedHeaders -eq $false) #Only do Delta join if not using files from exporter as exporter joins the files
 {
     <#
-    $importedStudents = (Join-eduHubDelta $fileStudent $fileStudentDelta "STKEY") | 
-	select -Property @{label="SIS_ID";expression={$($_."STKEY")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
+    $importedStudents = (Join-eduHubDelta $fileStudent $fileStudentDelta "SIS_ID") | 
+	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
 	Sort-Object -property SIS_ID 
     #>
 }
 elseif ($includeDeltas -eq $false -and $modifiedHeaders -eq $false) #Only Run import if not using modified headers from exporter
 {
-    $importedStudents = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStudents) | Select-Object -Property STKEY,PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,EXIT_DATE,HOME_GROUP,SCHOOL_YEAR,FAMILY,USERNAME,E_MAIL,CONTACT_A,STATUS,ALIAS,EXPORT | Sort-Object -property STATUS, STKEY
+    $importedStudents = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStudents) | Select-Object -Property  @{Name="SIS_ID";Expression={$_."STKEY"}},PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,EXIT_DATE,HOME_GROUP,SCHOOL_YEAR,FAMILY,USERNAME,E_MAIL,CONTACT_A,STATUS,ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
 }
 elseif ($modifiedHeaders -eq $true)
 {
     <#
-    $importedStudents = (Join-eduHubDelta $fileStudent $fileStudentDelta "STKEY") | 
-	select -Property @{label="STKEY";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
+    $importedStudents = (Join-eduHubDelta $fileStudent $fileStudentDelta "SIS_ID") | 
+	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
 	Sort-Object -property SIS_ID 
     #>
 }
@@ -488,9 +520,10 @@ else
 
 foreach ($student in $workingStudents)
 {
+    $tempUser = $null
     if ($null -ne ($tempUser = (Merge-User -workingUser $student -exitAfter $handlingStudentExitAfter -handlingEmail $handlingStudentEmail -handlingUsername $handlingStudentUsername -handlingAlias $handlingStudentAlias -handlingNoUser $handlingExportNoUser)))
     {
-        $workingStudents += $tempUser
+        $student = $tempUser
     }
 }
 
@@ -518,20 +551,20 @@ $currentDate = Get-Date
 if ($includeDeltas -eq $true -and $modifiedHeaders -eq $false) #Only do Delta join if not using files from exporter as exporter joins the files
 {
     <#
-    $importedStaff = (Join-eduHubDelta $fileStaff $fileStaffDelta "STKEY") | 
-	select -Property @{label="SIS_ID";expression={$($_."STKEY")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
+    $importedStaff = (Join-eduHubDelta $fileStaff $fileStaffDelta "SIS_ID") | 
+	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
 	Sort-Object -property SIS_ID 
     #>
 }
 elseif ($includeDeltas -eq $false -and $modifiedHeaders -eq $false) #Only Run import if not using modified headers from exporter
 {
-    $importedStaff = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStaff) | Select-Object -Property SFKEY,PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,FINISH,HOMEKEY,USERNAME,E_MAIL,STAFF_STATUS,PAYROLL_REC_NO,ALIAS,EXPORT | Sort-Object -property STAFF_STATUS, SFKEY
+    $importedStaff = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStaff) | Select-Object -Property @{Name="SIS_ID";Expression={$_."SFKEY"}},PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,@{Name="EXIT_DATE";Expression={$_."FINISH"}},HOMEKEY,USERNAME,E_MAIL,@{Name="STATUS";Expression={$_."STAFF_STATUS"}},PAYROLL_REC_NO,ALIAS,EXPORT | Sort-Object -property STAFF_STATUS, SIS_ID
 }
 elseif ($modifiedHeaders -eq $true)
 {
     <#
-    $importedStaff = (Join-eduHubDelta $fileStaff $fileStaffDelta "STKEY") | 
-	select -Property @{label="STKEY";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
+    $importedStaff = (Join-eduHubDelta $fileStaff $fileStaffDelta "SIS_ID") | 
+	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
 	Sort-Object -property SIS_ID 
     #>
 }
@@ -543,7 +576,7 @@ else
 ##################### $importedStaff | Where-Object {$_.STATUS -eq "LEFT" -and ($currentDate - ((Get-Date $_.EXIT_DATE).Days) -lt $handlingStaffExitAfter) }
 foreach ($staff in $importedStaff)
 {
-    if ($null -ne ($tempUser = (Merge-User -workingUser $staff -exitAfter $handlingStaffExitAfter -handlingEmail $handlingStaffEmail -handlingUsername $handlingStaffUsername  -handlingAlias $handlingStaffAlias -handlingNoUser $handlingExportNoUser)))
+    if ($null -ne ($tempUser = (Merge-User -workingUser $staff -exitAfter $handlingStaffExitAfter -handlingEmail $handlingStaffEmail -handlingUsername $handlingStaffUsername  -handlingAlias $handlingStaffAlias -handlingNoUser $handlingExportNoUser -userStaff )))
     {
         $workingStaff += $tempUser
     }
