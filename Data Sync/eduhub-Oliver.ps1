@@ -408,18 +408,20 @@ Function Merge-User
 
 ###################### Import Config File If Specified ######################
 #Importing the Config file will overwrite the defaults with the config data, including blank and null values, if its declared it will be overwritten
-try 
-    {
-        Import-Module $fileConfig
-    }
-    catch
-    {
-        Write-Host "Cannot Load Config File, Exiting"
-        exit
-    }
-
+if ($null -ne $fileConfig)
+{
+    try 
+        {
+            Import-Module $fileConfig
+        }
+        catch
+        {
+            Write-Host "Cannot Load Config File, Exiting"
+            exit
+        }
+}
 ###################### Retrieve AD Users if Reqired ######################
-
+<#
 $handlingLicencingValue = "licencingOliver" #The attribute name for the licencing Data
 $handlingADStaffType = "employeeType" #The attribute name for stating whether its a staff user or not for imports, only important if $handlingCreateNonEduhub is true, needs to be "Staff" or "15" (as in UserCreator) otherwise will assume student
 $ADUsers = $null
@@ -468,11 +470,11 @@ if ($handlingValidateLicencing -or $handlingCreateNonEduhub -or (($handlingStude
     }
     catch 
     {
-        {1:<#Do this if a terminating exception happens#>}
+        
     }
 
 }
-
+#>
 ######################Import and Process Students######################
 
 $importedStudents = $null
@@ -580,4 +582,88 @@ foreach ($staff in $importedStaff)
     {
         $workingStaff += $tempUser
     }
+}
+
+###################### Import and Process Families ######################
+
+$importedFamilies = $null
+$workingFamilies = @()
+
+#Import Families from CSV(s) based upon settings
+
+if ($includeDeltas -eq $true -and $modifiedHeaders -eq $false) #Only do Delta join if not using files from exporter as exporter joins the files
+{
+    <#
+    $importedFamilies = (Join-eduHubDelta $importFileFamilies $importFileFamiliesDelta "SIS_ID") | 
+	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
+	Sort-Object -property SIS_ID 
+    #>
+}
+elseif ($includeDeltas -eq $false -and $modifiedHeaders -eq $false) #Only Run import if not using modified headers from exporter
+{
+    $importedFamilies = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) | Select-Object -Property DFKEY,EMAIL_A,MOBILE_A,EMAIL_B,MOBILE_B,HOMEKEY | Sort-Object -property DFKEY
+}
+elseif ($modifiedHeaders -eq $true)
+{
+    <#
+    $importedFamilies = (Join-eduHubDelta $importFileFamilies $importFileFamiliesDelta "SIS_ID") | 
+	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
+	Sort-Object -property SIS_ID 
+    #>
+}
+else
+{
+    throw "Cannot Import Error with locating or processing files"
+}
+
+foreach ($family in $importedFamilies)
+{
+    if ($workingStudents.FAMILY -match $family.DFKEY)
+    {
+        $workingFamilies += $family
+    }
+    
+}
+
+#####TODO: Sort So Contact A is primary carer
+
+###################### Import and Process Addresses ######################
+
+$importedAddresses = $null
+$workingAddresses = @()
+
+#Import Addresses from CSV(s) based upon settings
+
+if ($includeDeltas -eq $true -and $modifiedHeaders -eq $false) #Only do Delta join if not using files from exporter as exporter joins the files
+{
+    <#
+    $importedAddresses = (Join-eduHubDelta $importFileAddresses $importFileAddressesDelta "SIS_ID") | 
+	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
+	Sort-Object -property SIS_ID 
+    #>
+}
+elseif ($includeDeltas -eq $false -and $modifiedHeaders -eq $false) #Only Run import if not using modified headers from exporter
+{
+    $importedAddresses = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileAddresses) | Select-Object -Property UMKEY,ADDRESS01,ADDRESS02,ADDRESS03,STATE,POSTCODE,TELEPHONE,MOBILE | Sort-Object -property UMKEY
+}
+elseif ($modifiedHeaders -eq $true)
+{
+    <#
+    $importedAddresses = (Join-eduHubDelta $importFileAddresses $importFileAddressesDelta "SIS_ID") | 
+	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
+	Sort-Object -property SIS_ID 
+    #>
+}
+else
+{
+    throw "Cannot Import Error with locating or processing files"
+}
+
+foreach ($address in $importedAddresses)
+{
+    if (($workingFamilies.HOMEKEY -match $address.UMKEY) -or ($workingStaff.HOMEKEY -match $address.UMKEY))
+    {
+        $workingAddresses += $address
+    }
+    
 }
