@@ -67,10 +67,10 @@ $sScriptVersion = "1.0"
 $fileConfig = $null #Null or Blank for ignore, any other value and the script will attempt import
 
 #School Details
-$schoolID = "3432" # Used for export and for import if using CASES File Names
+$schoolID = "schoolno" # Used for export and for import if using CASES File Names
 #$schoolID = [system.environment]::MachineName.Trim().Substring(0,4)
 
-$schoolEmailDomain = "mwps.vic.edu.au" #Only used if processing emails or users from CASES Data
+$schoolEmailDomain = "schooldom" #Only used if processing emails or users from CASES Data
 
 #File Settings
 $modifiedHeaders = $false #Use Modified Export Headers (from export script in this Repo), if not it will look for standard eduHub headers
