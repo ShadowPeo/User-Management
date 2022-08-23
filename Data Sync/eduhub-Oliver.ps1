@@ -58,7 +58,13 @@ $ErrorActionPreference = "SilentlyContinue"
 #Dot Source required Function Libraries
 . "$PSScriptRoot\Modules\Logging.ps1"
 
+
 #----------------------------------------------------------[Declarations]----------------------------------------------------------
+
+Param 
+    (
+        [string]$fileConfig = $null
+    )
 
 #Script Version
 $sScriptVersion = "1.0"
@@ -67,19 +73,19 @@ $sScriptVersion = "1.0"
 $fileConfig = $null #Null or Blank for ignore, any other value and the script will attempt import
 
 #School Details
-$schoolID = "3432" # Used for export and for import if using CASES File Names
+$schoolID = "7893" # Used for export and for import if using CASES File Names
 #$schoolID = [system.environment]::MachineName.Trim().Substring(0,4)
 
-$schoolEmailDomain = "mwps.vic.edu.au" #Only used if processing emails or users from CASES Data
+$schoolEmailDomain = "westernportsc.vic.edu.au" #Only used if processing emails or users from CASES Data
 
 #File Settings
 $modifiedHeaders = $false #Use Modified Export Headers (from export script in this Repo), if not it will look for standard eduHub headers
-$includeDeltas = $false #Include eduHub Delta File
+$includeDeltas = $true #Include eduHub Delta File
 
 #File Locations
 $fileLocation = "$PSSCriptRoot/Import"
 $importFileStudents = "ST_$SchoolID.csv"
-$importFileStudentsDelta = "ST_$SchoolID_D.csv"
+$importFileStudentsDelta = "ST_$($SchoolID)_D.csv"
 $importFileStaff = "SF_$SchoolID.csv"
 $importFileStaffDelta = "SF_$SchoolID_D.csv"
 $importFileYearLevels = "KCY_$SchoolID.csv"
@@ -89,31 +95,37 @@ $importFileAddresses = "UM_$SchoolID.csv"
 $importFileAddressesDelta = "UM_$SchoolID_D.csv"
 
 #Processing Handling Varialbles
-$handlingStudentExitAfter = 365 #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left students
+$handlingStudentExitAfter = 365 #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left students, -1 will always export them
 $handlingStaffExitAfter = 365 #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left staff, -1 will always export them
 $handlingFileYearLevel = 1 # 1 = Static (use the one from cache, if not exist cache copy and us as literal) 2 = Use Literal, description will e exported exactly as is. 3 = Pad the year numbers (if they exist) in the description field
 $handlingIncludeFutures = $true #Include Future Students
 $handlingStudentEmail = 1 #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP)
-$handlingStaffEmail = 1 #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
+$handlingStaffEmail = 1 #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
 $handlingStudentUsername = 1 #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName
-$handlingStaffUsername = 1 #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName, 6 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
+$handlingStaffUsername = 1 #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName, 6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
 $handlingStudentAlias = 1 #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID
-$handlingStaffAlias = 3 #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
+$handlingStaffAlias = 1 #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
 $handlingValidateLicencing = $false #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled
 $handlingCreateNonEduhub = $false #Create accounts for users where licencing is explicitly enabled but not in eduHub data samAccountName becomes Alias other attributes handled as per settings (where available) or defaults
 $handlingLicencingValue = "licencingOliver" #The attribute name for the licencing Data
 $handlingADStaffType = "employeeType" #The attribute name for stating whether its a staff user or not for imports, only important if $handlingCreateNonEduhub is true, needs to be "Staff" or "15" (as in UserCreator) otherwise will assume student
 $handlingExportNoUser = $true #Export user if there is no matching username in AD, if AD lookup is in use
 
-#Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SIS_ID) or in the case of staff members PAYROLL_REC_NO Matches will also be based upon email matching UPN
+#Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SIS_ID) or in the case of staff members PAYROLL_REC_NO/SIS_EMPNO Matches will also be based upon email matching UPN
 $runAsLoggedIn = $true
 $activeDirectoryUser = $null #Username to connect to AD as, will prompt for password if credentials do not exist or are incorrect, not used if not running as logged in user
 $activeDirectoryServer = "10.124.228.137" #DNS Name or IP of AD Server
+$activeDirectorySearchBase = "10.124.228.137" #DNS Name or IP of AD Server
 
 #Log File Info
 $sLogPath = "C:\Windows\Temp"
 $sLogName = "<script_name>.log"
 $sLogFile = Join-Path -Path $sLogPath -ChildPath $sLogName
+
+#Script Variables - Declared to stop it being generated multiple times per run
+
+#Date
+$currentDate = Get-Date
 
 #-----------------------------------------------------------[Functions]------------------------------------------------------------
 
@@ -132,33 +144,62 @@ function Join-eduHubDelta
     (
         [Parameter(Mandatory=$true)][string]$file1, 
         [Parameter(Mandatory=$true)][string]$file2, 
-        [Parameter(Mandatory=$true)][string]$matchAttribute
+        [Parameter(Mandatory=$true)][string]$outputPath,
+        [Parameter(Mandatory=$true)][string]$matchAttribute,
+        [boolean]$force
     )
-
-    $file1Import = Import-Csv -Path $file1
     
-    ## Merge the two files if the second file is newer than the second
-    if ((Get-Item $file1).LastWriteTime -lt (Get-Item $file2).LastWriteTime)
+    ## Merte the two files if the second file is newer than the second
+    if (((Get-Item $file1).LastWriteTime -lt (Get-Item $file2).LastWriteTime) -or $force -eq $true)
     {
+        LogWrite "Delta File is newer than Base File, Merging" -noOutput:$true
+        
+        ### Set the output file location
+        
+        ### Test to ensure output path is vaild, if not create it
+        if(!(test-path $outputPath))
+        {
+              New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
+        }
+        
+        $outputFile = "$outputPath\$((Get-Item $file1).Name)"
+
+        $file1Import = Import-Csv -Path $file1
         $file2Import = Import-Csv -Path $file2
 
         foreach ($record in $file2Import)
         {
             if ($file1Import.$matchAttribute -contains $record.$matchAttribute)
             {
-                $file1Import[([array]::IndexOf( $file1Import.$matchAttribute , $record.$matchAttribute ))] = $record
+                LogWrite "Record ($($record.$matchAttribute)) Matches Existing Record, Merging" -noOutput:$true
+                
+                foreach ($row in $file1Import)
+                {
+                    if ($row.$matchAttribute -eq $record.$matchAttribute)
+                    {
+                        $row = $record
+                    }
+                }
+            }
+            else
+            {
+                LogWrite "New Record Found, Inserting" -noOutput:$true
+                
+                return $file1
+                $file1Import += $record
             }
         }
 
-        return $file1Import
+        $file1Import | Export-CSV $outputFile -Encoding ASCII  -NoTypeInformation
+
+        return $outputFile
     }
     else
     { 
-        return $file1Import
+        LogWrite "Newer file not detected, skipping" -noOutput:$true
+        return $file1
     }
 }
-
-
 
 Function Merge-User
 {
@@ -187,7 +228,7 @@ Function Merge-User
             if ($exitAfter -gt 1)
             {
                 #check if current date is more than $exitAfter days after the users exited date
-                if(((($currentDate - (Get-Date $workingUser.EXIT_DATE)).Days) -gt $exitAfter))
+                if(((($currentDate - (Get-Date $workingUser.FINISH)).Days) -gt $exitAfter))
                 {
                     return $null
                 }
@@ -201,7 +242,6 @@ Function Merge-User
         {
             return $null
         }
-        
        #Email Handling
        switch ($handlingEmail)
         {
@@ -231,17 +271,16 @@ Function Merge-User
             5   {
                     
                 }
-            #6 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from Active Directory, fall back to SIS_ID
+            #6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from Active Directory, fall back to SIS_ID
             6   {
                     
                 }
-            #7 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub, fall back to SIS_ID
-            {7 -and $userStaff -eq $true}
-
+            #7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub, fall back to SIS_ID
+            {$_ -eq 7 -and $userStaff}
                 {
-                    if (-not [string]::IsNullOrWhiteSpace($workingUser.PAYROLL_REC_NO))
+                    if (-not [string]::IsNullOrWhiteSpace($workingUser.SIS_EMPNO))
                     {
-                        $workingUser.E_MAIL = "$(($workingUser.PAYROLL_REC_NO).ToLower())@$schoolEmailDomain"
+                        $workingUser.E_MAIL = "$(($workingUser.SIS_EMPNO).ToLower())@$schoolEmailDomain"
                     }
                     else
                     {
@@ -298,17 +337,17 @@ Function Merge-User
             5   {
                     
                 }
-            #6 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from Active Directory, fall back to SIS_ID
+            #6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from Active Directory, fall back to SIS_ID
             6   {
                     
                 }
-            #7 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub, fall back to SIS_ID
+            #7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub, fall back to SIS_ID
             {7 -and $userStaff -eq $true}
 
                 {
-                    if (-not [string]::IsNullOrWhiteSpace($workingUser.PAYROLL_REC_NO))
+                    if (-not [string]::IsNullOrWhiteSpace($workingUser.SIS_EMPNO))
                     {
-                        $workingUser.USERNAME = $workingUser.PAYROLL_REC_NO
+                        $workingUser.USERNAME = $workingUser.SIS_EMPNO
                     }
                     else
                     {
@@ -354,13 +393,13 @@ Function Merge-User
             3   {
                     
                 }
-            #4 = Use employeeID (PAYROLL_REC_NO/EmployeeNumber) from eduHub Data
+            #4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data
             {4 -and $userStaff -eq $true}
 
                 {
-                    if (-not [string]::IsNullOrWhiteSpace($workingUser.PAYROLL_REC_NO))
+                    if (-not [string]::IsNullOrWhiteSpace($workingUser.SIS_EMPNO))
                     {
-                        $workingUser.ALIAS = $workingUser.PAYROLL_REC_NO
+                        $workingUser.ALIAS = $workingUser.SIS_EMPNO
                     }
                     else
                     {
@@ -380,7 +419,6 @@ Function Merge-User
                     }
                 }
         }
-
         return $workingUser
 
     }
@@ -408,7 +446,7 @@ Function Merge-User
 
 ###################### Import Config File If Specified ######################
 #Importing the Config file will overwrite the defaults with the config data, including blank and null values, if its declared it will be overwritten
-if ($null -ne $fileConfig)
+if (-not [string]::IsNullOrWhiteSpace($fileConfig))
 {
     try 
         {
@@ -420,8 +458,9 @@ if ($null -ne $fileConfig)
             exit
         }
 }
-###################### Retrieve AD Users if Reqired ######################
-<#
+
+###################### Retrieve AD Users if Required ######################
+
 $handlingLicencingValue = "licencingOliver" #The attribute name for the licencing Data
 $handlingADStaffType = "employeeType" #The attribute name for stating whether its a staff user or not for imports, only important if $handlingCreateNonEduhub is true, needs to be "Staff" or "15" (as in UserCreator) otherwise will assume student
 $ADUsers = $null
@@ -436,6 +475,7 @@ if ($handlingValidateLicencing -or $handlingCreateNonEduhub -or (($handlingStude
     {
         throw "Cannot Load Active Directory Module"
     }
+    
     if ([string]::IsNullOrWhiteSpace($activeDirectoryServer))
     {
         Write-Host "Active Directory use is required, but no server is specfied"
@@ -447,7 +487,7 @@ if ($handlingValidateLicencing -or $handlingCreateNonEduhub -or (($handlingStude
         exit
     }
 
-    try 
+    <#try 
     {
         if ($runAsLoggedIn -eq $true)
         {
@@ -471,76 +511,47 @@ if ($handlingValidateLicencing -or $handlingCreateNonEduhub -or (($handlingStude
     catch 
     {
         
-    }
+    }#>
 
 }
-#>
 ######################Import and Process Students######################
 
 $importedStudents = $null
 $workingStudents = @()
 
-#Get The Date, Put here so only done once for the run
-$currentDate = Get-Date
-
 #Import Students from CSV(s) based upon settings
 
 if ($includeDeltas -eq $true -and $modifiedHeaders -eq $false) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    <#
-    $importedStudents = (Join-eduHubDelta $fileStudent $fileStudentDelta "SIS_ID") | 
-	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
-	Sort-Object -property SIS_ID 
-    #>
+    $importedStudents = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileStudents) (Join-Path -Path $fileLocation -ChildPath $importFileStudentsDelta) "$PSScriptRoot\Cache\" "STKEY")  | Select-Object -Property  @{Name="SIS_ID";Expression={$_."STKEY"}},PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,@{Name="FINISH";Expression={$_."EXIT_DATE"}},HOME_GROUP,SCHOOL_YEAR,FAMILY,USERNAME,E_MAIL,CONTACT_A,STATUS,ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
 }
 elseif ($includeDeltas -eq $false -and $modifiedHeaders -eq $false) #Only Run import if not using modified headers from exporter
 {
-    $importedStudents = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStudents) | Select-Object -Property  @{Name="SIS_ID";Expression={$_."STKEY"}},PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,EXIT_DATE,HOME_GROUP,SCHOOL_YEAR,FAMILY,USERNAME,E_MAIL,CONTACT_A,STATUS,ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
+    $importedStudents = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStudents) | Select-Object -Property  @{Name="SIS_ID";Expression={$_."STKEY"}},PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,@{Name="FINISH";Expression={$_."EXIT_DATE"}},HOME_GROUP,SCHOOL_YEAR,FAMILY,USERNAME,E_MAIL,CONTACT_A,STATUS,ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
 }
 elseif ($modifiedHeaders -eq $true)
 {
-    <#
-    $importedStudents = (Join-eduHubDelta $fileStudent $fileStudentDelta "SIS_ID") | 
-	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
-	Sort-Object -property SIS_ID 
-    #>
+    $importedStudents = (Join-Path -Path $fileLocation -ChildPath $importFileStudents) | Select-Object -Property  SIS_ID,PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,FINISH,HOME_GROUP,SCHOOL_YEAR,FAMILY,USERNAME,E_MAIL,CONTACT_A,STATUS,ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
 }
 else
 {
     throw "Cannot Import Error with locating or processing files"
 }
 
-#Include Active, and Leaving students as we know they do not need date validation, and Future Students if set for that as well
-if ($handlingIncludeFutures -eq $true)
-{
-    $workingStudents = $importedStudents | Where-Object {$_.STATUS -eq "ACTV" -or $_.STATUS -eq "LVNG"  -or $_.STATUS -eq "FUT" }
-}
-else
-{
-    $workingStudents = $importedStudents | Where-Object {$_.STATUS -eq "ACTV" -or $_.STATUS -eq "LVNG" }
-}
+#Process Students
 
-foreach ($student in $workingStudents)
+foreach ($student in $importedStudents)
 {
     $tempUser = $null
-    if ($null -ne ($tempUser = (Merge-User -workingUser $student -exitAfter $handlingStudentExitAfter -handlingEmail $handlingStudentEmail -handlingUsername $handlingStudentUsername -handlingAlias $handlingStudentAlias -handlingNoUser $handlingExportNoUser)))
-    {
-        $student = $tempUser
-    }
-}
-
-
-##################### $importedStudents | Where-Object {$_.STATUS -eq "LEFT" -and ($currentDate - ((Get-Date $_.EXIT_DATE).Days) -lt $handlingStudentExitAfter) }
-foreach ($student in ($importedStudents | Where-Object {$_.STATUS -eq "LEFT" }))
-{
     if ($null -ne ($tempUser = (Merge-User -workingUser $student -exitAfter $handlingStudentExitAfter -handlingEmail $handlingStudentEmail -handlingUsername $handlingStudentUsername -handlingAlias $handlingStudentAlias -handlingNoUser $handlingExportNoUser)))
     {
         $workingStudents += $tempUser
     }
 }
 
+$importedStudents = $null #Explicitly destroy data to clear up resources
 
-######################Import and Process Staff######################
+###################### Import and Process Staff ######################
 
 $importedStaff = $null
 $workingStaff = @()
@@ -552,30 +563,22 @@ $currentDate = Get-Date
 
 if ($includeDeltas -eq $true -and $modifiedHeaders -eq $false) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    <#
-    $importedStaff = (Join-eduHubDelta $fileStaff $fileStaffDelta "SIS_ID") | 
-	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
-	Sort-Object -property SIS_ID 
-    #>
+    $importedStaff = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileStaff)(Join-Path -Path $fileLocation -ChildPath $importFileStaffDelta) "$PSScriptRoot\Cache\" "SFKEY")  | Select-Object -Property @{Name="SIS_ID";Expression={$_."SFKEY"}},PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,FINISH,HOMEKEY,USERNAME,E_MAIL,@{Name="STATUS";Expression={$_."STAFF_STATUS"}},@{Name="SIS_EMPNO";Expression={$_."PAYROLL_REC_NO"}},ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
 }
 elseif ($includeDeltas -eq $false -and $modifiedHeaders -eq $false) #Only Run import if not using modified headers from exporter
 {
-    $importedStaff = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStaff) | Select-Object -Property @{Name="SIS_ID";Expression={$_."SFKEY"}},PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,@{Name="EXIT_DATE";Expression={$_."FINISH"}},HOMEKEY,USERNAME,E_MAIL,@{Name="STATUS";Expression={$_."STAFF_STATUS"}},PAYROLL_REC_NO,ALIAS,EXPORT | Sort-Object -property STAFF_STATUS, SIS_ID
+    $importedStaff = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStaff) | Select-Object -Property @{Name="SIS_ID";Expression={$_."SFKEY"}},PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,FINISH,HOMEKEY,USERNAME,E_MAIL,@{Name="STATUS";Expression={$_."STAFF_STATUS"}},@{Name="SIS_EMPNO";Expression={$_."PAYROLL_REC_NO"}},ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
 }
 elseif ($modifiedHeaders -eq $true)
 {
-    <#
-    $importedStaff = (Join-eduHubDelta $fileStaff $fileStaffDelta "SIS_ID") | 
-	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
-	Sort-Object -property SIS_ID 
-    #>
+    $importedStaff = (Join-eduHubDelta $fileStaff $fileStaffDelta "SIS_ID") | Select-Object -Property SIS_ID,PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,FINISH,HOMEKEY,USERNAME,E_MAIL,STATUS,SIS_EMPNO,ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
 }
 else
 {
     throw "Cannot Import Error with locating or processing files"
 }
 
-##################### $importedStaff | Where-Object {$_.STATUS -eq "LEFT" -and ($currentDate - ((Get-Date $_.EXIT_DATE).Days) -lt $handlingStaffExitAfter) }
+#Process Staff
 foreach ($staff in $importedStaff)
 {
     if ($null -ne ($tempUser = (Merge-User -workingUser $staff -exitAfter $handlingStaffExitAfter -handlingEmail $handlingStaffEmail -handlingUsername $handlingStaffUsername  -handlingAlias $handlingStaffAlias -handlingNoUser $handlingExportNoUser -userStaff )))
@@ -584,81 +587,63 @@ foreach ($staff in $importedStaff)
     }
 }
 
+$importedStaff = $null #Explicitly destroy data to clear up resources
+
 ###################### Import and Process Families ######################
 
 $importedFamilies = $null
 $workingFamilies = @()
 
-#Import Families from CSV(s) based upon settings
+#Import Families from CSV(s) based upon settings - No modified headers here as there is no need due to their only being the one table of this type
 
-if ($includeDeltas -eq $true -and $modifiedHeaders -eq $false) #Only do Delta join if not using files from exporter as exporter joins the files
+if ($includeDeltas -eq $true) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    <#
-    $importedFamilies = (Join-eduHubDelta $importFileFamilies $importFileFamiliesDelta "SIS_ID") | 
-	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
-	Sort-Object -property SIS_ID 
-    #>
-}
-elseif ($includeDeltas -eq $false -and $modifiedHeaders -eq $false) #Only Run import if not using modified headers from exporter
-{
-    $importedFamilies = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) | Select-Object -Property DFKEY,EMAIL_A,MOBILE_A,EMAIL_B,MOBILE_B,HOMEKEY | Sort-Object -property DFKEY
-}
-elseif ($modifiedHeaders -eq $true)
-{
-    <#
-    $importedFamilies = (Join-eduHubDelta $importFileFamilies $importFileFamiliesDelta "SIS_ID") | 
-	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
-	Sort-Object -property SIS_ID 
-    #>
+    $importedFamilies = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) (Join-Path -Path $fileLocation -ChildPath $importFileFamiliesDelta) "$PSScriptRoot\Cache\" "DFKEY") | Select-Object -Property DFKEY,EMAIL_A,MOBILE_A,EMAIL_B,MOBILE_B,HOMEKEY | Sort-Object -property DFKEY
 }
 else
 {
-    throw "Cannot Import Error with locating or processing files"
+    $importedFamilies = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) | Select-Object -Property DFKEY,EMAIL_A,MOBILE_A,EMAIL_B,MOBILE_B,HOMEKEY | Sort-Object -property DFKEY
 }
+
+
+#Sort families so that only families where there is an active student are kept and that are due to be exported, then with an active family check to see if primary contact is contact B (A and C are left as A), if so change the details, Contact B is dropped on export
 
 foreach ($family in $importedFamilies)
 {
     if ($workingStudents.FAMILY -match $family.DFKEY)
     {
         $workingFamilies += $family
+        
+        if ((($workingStudents | Where-Object {$_.FAMILY -eq $family.DFKEY} | Sort-Object -Property SIS_ID | select-object -First 1).CONTACT_A) -eq "B")
+        {
+            $family.EMAIL_A = $family.EMAIL_B
+            $family.MOBILE_A = $family.MOBILE_B
+            Write-Host "Changing Contacts for $($family.DFKEY)"
+        }
+        
     }
     
 }
 
-#####TODO: Sort So Contact A is primary carer
+$importedFamilies = $null #Explicitly destroy data to clear up resources
 
 ###################### Import and Process Addresses ######################
 
 $importedAddresses = $null
 $workingAddresses = @()
 
-#Import Addresses from CSV(s) based upon settings
+#Import Addresses from CSV(s) based upon settings - No modified headers here as there is no need due to their only being the one table of this type
 
-if ($includeDeltas -eq $true -and $modifiedHeaders -eq $false) #Only do Delta join if not using files from exporter as exporter joins the files
+if ($includeDeltas -eq $true) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    <#
-    $importedAddresses = (Join-eduHubDelta $importFileAddresses $importFileAddressesDelta "SIS_ID") | 
-	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
-	Sort-Object -property SIS_ID 
-    #>
-}
-elseif ($includeDeltas -eq $false -and $modifiedHeaders -eq $false) #Only Run import if not using modified headers from exporter
-{
-    $importedAddresses = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileAddresses) | Select-Object -Property UMKEY,ADDRESS01,ADDRESS02,ADDRESS03,STATE,POSTCODE,TELEPHONE,MOBILE | Sort-Object -property UMKEY
-}
-elseif ($modifiedHeaders -eq $true)
-{
-    <#
-    $importedAddresses = (Join-eduHubDelta $importFileAddresses $importFileAddressesDelta "SIS_ID") | 
-	select -Property @{label="SIS_ID";expression={$($_."SIS_ID")}},SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,@{label="SIS_EMAIL";expression={$($_."E_MAIL")}},HOUSE,CAMPUS,STATUS,@{label="START";expression={$($_."ENTRY")}},@{label="FINISH";expression={$($_."EXIT_DATE")}},SCHOOL_YEAR,HOME_GROUP,NEXT_HG
-	Sort-Object -property SIS_ID 
-    #>
+    $importedAddresses = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileAddresses) (Join-Path -Path $fileLocation -ChildPath $importFileAddressesDelta) "$PSScriptRoot\Cache\" "UMKEY")  | Select-Object -Property UMKEY,ADDRESS01,ADDRESS02,ADDRESS03,STATE,POSTCODE,TELEPHONE,MOBILE | Sort-Object -property UMKEY
 }
 else
 {
-    throw "Cannot Import Error with locating or processing files"
+    $importedAddresses = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileAddresses) | Select-Object -Property UMKEY,ADDRESS01,ADDRESS02,ADDRESS03,STATE,POSTCODE,TELEPHONE,MOBILE | Sort-Object -property UMKEY
 }
 
+#Sort through addresses, only keeping those where there is a family or staff member that are due to be exported associated with the address
 foreach ($address in $importedAddresses)
 {
     if (($workingFamilies.HOMEKEY -match $address.UMKEY) -or ($workingStaff.HOMEKEY -match $address.UMKEY))
@@ -667,3 +652,5 @@ foreach ($address in $importedAddresses)
     }
     
 }
+
+$importedAddresses = $null #Explicitly destroy data to clear up resources
