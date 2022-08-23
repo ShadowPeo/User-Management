@@ -1,3 +1,60 @@
+
+
+param 
+    (
+        #Config File Decleration - if used it will overwrite the default parameters below
+        [string]$fileConfig = $null,
+        
+        #School Details
+        [string]$schoolID = "7893", # Used for export and for import if using CASES File Names
+        #$schoolID = [system.environment]::MachineName.Trim().Substring(0,4)
+
+        [string]$schoolEmailDomain = "westernportsc.vic.edu.au", #Only used if processing emails or users from CASES Data
+
+        #File Settings
+        [boolean]$modifiedHeaders = $false, #Use Modified Export Headers (from export script in this Repo), if not it will look for standard eduHub headers
+        [boolean]$includeDeltas = $true, #Include eduHub Delta File
+
+        #File Locations
+        [string]$fileLocation = "$PSSCriptRoot\Import",
+        [string]$importFileStudents = "ST_$($SchoolID).csv",
+        [string]$importFileStudentsDelta = "ST_$($SchoolID)_D.csv",
+        [string]$importFileStaff = "SF_$($SchoolID).csv",
+        [string]$importFileStaffDelta = "SF_$($SchoolID)_D.csv",
+        [string]$importFileYearLevels = "KCY_$($SchoolID).csv",
+        [string]$importFileFamilies = "DF_$($SchoolID).csv",
+        [string]$importFileFamiliesDelta = "DF_$($SchoolID)_D.csv",
+        [string]$importFileAddresses = "UM_$($SchoolID).csv",
+        [string]$importFileAddressesDelta = "UM_$($SchoolID)_D.csv",
+
+        #Processing Handling Varialbles
+        [int]$handlingStudentExitAfter = 365, #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left students, -1 will always export them
+        [int]$handlingStaffExitAfter = 365, #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left staff, -1 will always export them
+        [int]$handlingFileYearLevel = 1, # 1 = Static (use the one from cache, if not exist cache copy and us as literal) 2 = Use Literal, description will e exported exactly as is. 3 = Pad the year numbers (if they exist) in the description field
+        [boolean]$handlingIncludeFutures = $true, #Include Future Students
+        [int]$handlingStudentEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP)
+        [int]$handlingStaffEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
+        $handlingStudentUsername = 1, #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName
+        $handlingStaffUsername = 1, #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName, 6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
+        [int]$handlingStudentAlias = 1, #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID
+        [int]$handlingStaffAlias = 1, #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
+        [boolean]$handlingValidateLicencing = $false, #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled
+        [boolean]$handlingCreateNonEduhub = $false, #Create accounts for users where licencing is explicitly enabled but not in eduHub data samAccountName becomes Alias other attributes handled as per settings (where available) or defaults
+        [string]$handlingLicencingValue = "licencingOliver", #The attribute name for the licencing Data
+        [string]$handlingADStaffType = "employeeType", #The attribute name for stating whether its a staff user or not for imports, only important if $handlingCreateNonEduhub is true, needs to be "Staff" or "15" (as in UserCreator) otherwise will assume student
+        [boolean]$handlingExportNoUser = $true, #Export user if there is no matching username in AD, if AD lookup is in use
+
+        #Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SIS_ID) or in the case of staff members PAYROLL_REC_NO/SIS_EMPNO Matches will also be based upon email matching UPN
+        [boolean]$runAsLoggedIn = $true,
+        [string]$activeDirectoryUser = $null, #Username to connect to AD as, will prompt for password if credentials do not exist or are incorrect, not used if not running as logged in user
+        [string]$activeDirectoryServer = "10.124.228.137", #DNS Name or IP of AD Server
+        [string]$activeDirectorySearchBase = "10.124.228.137", #DNS Name or IP of AD Server
+
+        #Log File Info
+        [string]$sLogPath = "C:\Windows\Temp",
+        [string]$sLogName = "<script_name>.log"
+    )
+
 #requires -version 2
 <#
 .SYNOPSIS
@@ -58,68 +115,8 @@ $ErrorActionPreference = "SilentlyContinue"
 #Dot Source required Function Libraries
 . "$PSScriptRoot\Modules\Logging.ps1"
 
-
 #----------------------------------------------------------[Declarations]----------------------------------------------------------
 
-Param 
-    (
-        [string]$fileConfig = $null
-    )
-
-#Script Version
-$sScriptVersion = "1.0"
-
-#Config File Decleration - if used it will overwrite the default parameters below
-$fileConfig = $null #Null or Blank for ignore, any other value and the script will attempt import
-
-#School Details
-$schoolID = "7893" # Used for export and for import if using CASES File Names
-#$schoolID = [system.environment]::MachineName.Trim().Substring(0,4)
-
-$schoolEmailDomain = "westernportsc.vic.edu.au" #Only used if processing emails or users from CASES Data
-
-#File Settings
-$modifiedHeaders = $false #Use Modified Export Headers (from export script in this Repo), if not it will look for standard eduHub headers
-$includeDeltas = $true #Include eduHub Delta File
-
-#File Locations
-$fileLocation = "$PSSCriptRoot/Import"
-$importFileStudents = "ST_$SchoolID.csv"
-$importFileStudentsDelta = "ST_$($SchoolID)_D.csv"
-$importFileStaff = "SF_$SchoolID.csv"
-$importFileStaffDelta = "SF_$SchoolID_D.csv"
-$importFileYearLevels = "KCY_$SchoolID.csv"
-$importFileFamilies = "DF_$SchoolID.csv"
-$importFileFamiliesDelta = "DF_$SchoolID_D.csv"
-$importFileAddresses = "UM_$SchoolID.csv"
-$importFileAddressesDelta = "UM_$SchoolID_D.csv"
-
-#Processing Handling Varialbles
-$handlingStudentExitAfter = 365 #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left students, -1 will always export them
-$handlingStaffExitAfter = 365 #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left staff, -1 will always export them
-$handlingFileYearLevel = 1 # 1 = Static (use the one from cache, if not exist cache copy and us as literal) 2 = Use Literal, description will e exported exactly as is. 3 = Pad the year numbers (if they exist) in the description field
-$handlingIncludeFutures = $true #Include Future Students
-$handlingStudentEmail = 1 #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP)
-$handlingStaffEmail = 1 #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
-$handlingStudentUsername = 1 #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName
-$handlingStaffUsername = 1 #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName, 6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
-$handlingStudentAlias = 1 #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID
-$handlingStaffAlias = 1 #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
-$handlingValidateLicencing = $false #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled
-$handlingCreateNonEduhub = $false #Create accounts for users where licencing is explicitly enabled but not in eduHub data samAccountName becomes Alias other attributes handled as per settings (where available) or defaults
-$handlingLicencingValue = "licencingOliver" #The attribute name for the licencing Data
-$handlingADStaffType = "employeeType" #The attribute name for stating whether its a staff user or not for imports, only important if $handlingCreateNonEduhub is true, needs to be "Staff" or "15" (as in UserCreator) otherwise will assume student
-$handlingExportNoUser = $true #Export user if there is no matching username in AD, if AD lookup is in use
-
-#Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SIS_ID) or in the case of staff members PAYROLL_REC_NO/SIS_EMPNO Matches will also be based upon email matching UPN
-$runAsLoggedIn = $true
-$activeDirectoryUser = $null #Username to connect to AD as, will prompt for password if credentials do not exist or are incorrect, not used if not running as logged in user
-$activeDirectoryServer = "10.124.228.137" #DNS Name or IP of AD Server
-$activeDirectorySearchBase = "10.124.228.137" #DNS Name or IP of AD Server
-
-#Log File Info
-$sLogPath = "C:\Windows\Temp"
-$sLogName = "<script_name>.log"
 $sLogFile = Join-Path -Path $sLogPath -ChildPath $sLogName
 
 #Script Variables - Declared to stop it being generated multiple times per run
@@ -302,13 +299,11 @@ Function Merge-User
                 {
                     $workingUser.USERNAME = "EXCLUDED"
                 }
-            
             #0 = Blank the field ""
             0 
                 {
                     $workingUser.USERNAME = ""
                 }
-            
             #1 = Use eduHub Key
             1 
                 {
