@@ -2,14 +2,12 @@
 
 param 
     (
-        #Config File Decleration - if used it will overwrite the default parameters below
-        [string]$fileConfig = $null,
         
         #School Details
-        [string]$schoolID = "7893", # Used for export and for import if using CASES File Names
+        [string]$schoolID = "3432", # Used for export and for import if using CASES File Names
         #$schoolID = [system.environment]::MachineName.Trim().Substring(0,4)
 
-        [string]$schoolEmailDomain = "westernportsc.vic.edu.au", #Only used if processing emails or users from CASES Data
+        [string]$schoolEmailDomain = "mwps.vic.edu.au", #Only used if processing emails or users from CASES Data
 
         #File Settings
         [boolean]$modifiedHeaders = $false, #Use Modified Export Headers (from export script in this Repo), if not it will look for standard eduHub headers
@@ -28,27 +26,25 @@ param
         [string]$importFileAddressesDelta = "UM_$($SchoolID)_D.csv",
 
         #Processing Handling Varialbles
-        [int]$handlingStudentExitAfter = 365, #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left students, -1 will always export them
-        [int]$handlingStaffExitAfter = 365, #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left staff, -1 will always export them
+        [float]$handlingStudentExitAfter = 365, #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left students, -1 will always export them
+        [float]$handlingStaffExitAfter = 365, #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left staff, -1 will always export them
         [int]$handlingFileYearLevel = 1, # 1 = Static (use the one from cache, if not exist cache copy and us as literal) 2 = Use Literal, description will e exported exactly as is. 3 = Pad the year numbers (if they exist) in the description field
         [boolean]$handlingIncludeFutures = $true, #Include Future Students
         [int]$handlingStudentEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP)
         [int]$handlingStaffEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
-        $handlingStudentUsername = 1, #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName
-        $handlingStaffUsername = 1, #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName, 6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
-        [int]$handlingStudentAlias = 1, #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID
+        [float]$handlingStudentUsername = 1, #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName
+        [float]$handlingStaffUsername = 1, #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName, 6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
+        [int]$handlingStudentAlias = 1, #1 = SIS_ID, 2= use samAccountName - Fall back to SIS_ID, 3 = Use employeeID from Active Directory - Fall back to SIS_ID
         [int]$handlingStaffAlias = 1, #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
-        [boolean]$handlingValidateLicencing = $false, #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled
-        [boolean]$handlingCreateNonEduhub = $false, #Create accounts for users where licencing is explicitly enabled but not in eduHub data samAccountName becomes Alias other attributes handled as per settings (where available) or defaults
+        [boolean]$handlingValidateLicencing = $false, #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled or where no user exists 
         [string]$handlingLicencingValue = "licencingOliver", #The attribute name for the licencing Data
-        [string]$handlingADStaffType = "employeeType", #The attribute name for stating whether its a staff user or not for imports, only important if $handlingCreateNonEduhub is true, needs to be "Staff" or "15" (as in UserCreator) otherwise will assume student
-        [boolean]$handlingExportNoUser = $true, #Export user if there is no matching username in AD, if AD lookup is in use
+        [boolean]$handlingExportNoUser = $false, #Export user if there is no matching username in AD, if AD lookup is in use
 
         #Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SIS_ID) or in the case of staff members PAYROLL_REC_NO/SIS_EMPNO Matches will also be based upon email matching UPN
         [boolean]$runAsLoggedIn = $true,
         [string]$activeDirectoryUser = $null, #Username to connect to AD as, will prompt for password if credentials do not exist or are incorrect, not used if not running as logged in user
-        [string]$activeDirectoryServer = "10.124.228.137", #DNS Name or IP of AD Server
-        [string]$activeDirectorySearchBase = "10.124.228.137", #DNS Name or IP of AD Server
+        [string]$activeDirectoryServer = "10.128.136.35", #DNS Name or IP of AD Server
+        [string]$activeDirectorySearchBase = $null, #DNS Name or IP of AD Server
 
         #Log File Info
         [string]$sLogPath = "C:\Windows\Temp",
@@ -123,6 +119,7 @@ $sLogFile = Join-Path -Path $sLogPath -ChildPath $sLogName
 
 #Date
 $currentDate = Get-Date
+$adCheck = $false #Changes to true if one of the settings requires an AD Check
 
 #-----------------------------------------------------------[Functions]------------------------------------------------------------
 
@@ -203,11 +200,10 @@ Function Merge-User
     Param 
     (
         [Parameter(Mandatory=$true)]$workingUser, 
-        [Parameter(Mandatory=$true)]$exitAfter, 
-        [Parameter(Mandatory=$true)]$handlingEmail,
-        [Parameter(Mandatory=$true)]$handlingUsername,
-        [Parameter(Mandatory=$true)]$handlingAlias,
-        [Parameter(Mandatory=$true)][boolean]$handlingNoUser,
+        [Parameter(Mandatory=$true)][float]$exitAfter, 
+        [Parameter(Mandatory=$true)][int]$handlingEmail,
+        [Parameter(Mandatory=$true)][float]$handlingUsername,
+        [Parameter(Mandatory=$true)][int]$handlingAlias,
         [switch]$userStaff = $false
     )
   
@@ -217,12 +213,16 @@ Function Merge-User
   
   Process{
     Try
-    {
+    {   
         #If user is marked as left, run exit check
-        if ($workingUser.STATUS -eq "LEFT")
+        if ($workingUser.STATUS -eq "INAC" -or $workingUser.STATUS -eq "DEL")
+        {
+            return $null
+        }
+        elseif ($workingUser.STATUS -eq "LEFT")
         {
             #Handle Exited Users if they are not meant to be exported, return null, else continue
-            if ($exitAfter -gt 1)
+            if ($exitAfter -ge 1)
             {
                 #check if current date is more than $exitAfter days after the users exited date
                 if(((($currentDate - (Get-Date $workingUser.FINISH)).Days) -gt $exitAfter))
@@ -235,16 +235,86 @@ Function Merge-User
                 return $null
             }
         } 
-        elseif ($workingUser.STATUS -eq "INAC")
+        
+        if ($adCheck)
         {
-            return $null
+            #Check AD User existence if $handingExportNoUser = $false or $handlingValidateLicencing is true and there is no user that has the ID in the samAccountName, UserPrincipalName or EmployeeID Fields
+            if (
+                (-not $handlingExportNoUser -or $handlingValidateLicencing) -and
+                    (
+                        (
+                            (-not $handlingExportNoUser -or $handlingValidateLicencing) -and
+                            (
+                                (
+                                    ($ADUsers.samAccountName -notcontains $workingUser.SIS_ID) -and 
+                                    ($ADUsers.employeeID -notcontains $workingUser.SIS_ID) -and
+                                    (@($ADUsers.UserPrincipalName -like "$($workingUser.SIS_ID)@*").count -eq 0 )
+                                ) -or 
+                                ($userStaff -and 
+                                    (
+                                        ($ADUsers.samAccountName -notcontains $workingUser.SIS_EMPNO) -and
+                                        (@($ADUsers.UserPrincipalName -like "$($workingUser.SIS_EMPNO)@*").Count -eq 0 ) -and
+                                        ($ADUsers.employeeID -notcontains $workingUser.SIS_EMPNO)
+                                    )
+
+                                )
+                            )
+                        )
+                    )
+                )
+            {
+                Write-Host "Dropping user $($workingUser.SIS_ID)$(if ( -not [string]::IsNullOrWhiteSpace($workingUser.SIS_EMPNO)){"|$($workingUser.SIS_EMPNO)"}) because there is no AD User and either licencing validation is in effect or exporting of users without an AD account is disabled"
+                return $null
+                
+            }
+            
+            $AD_User = $null
+            $AD_User = $ADusers | where-object { 
+                $_.samAccountName -eq $workingUser.SIS_ID -or 
+                 ($_.employeeID -contains $workingUser.SIS_ID -and 
+                     (
+                         ((@($ADUsers | Where-Object -Property employeeID -eq  $workingUser.SIS_ID).Count) -eq 1) -or 
+                         ((@($ADUsers | Where-Object -Property employeeID -eq  $workingUser.SIS_ID).Count) -gt 1 -and $_.Enabled -eq $true)
+                     )
+                 ) -or 
+                 ($_.UserPrincipalName -like "$($workingUser.SIS_ID)@*") -or
+                 (
+                     (
+                         ($userStaff -and $null -ne [string]::IsNullOrWhiteSpace($workingUser.SIS_EMPNO)) -and 
+                         (
+                             ($_.samAccountName -contains $workingUser.SIS_EMPNO) -or
+                             ($_.employeeID -contains $workingUser.SIS_EMPNO -and 
+                                 (
+                                     ((@($ADUsers | Where-Object -Property employeeID -eq  $workingUser.SIS_EMPNO).Count) -eq 1) -or 
+                                     ((@($ADUsers | Where-Object -Property employeeID -eq  $workingUser.SIS_EMPNO).Count) -gt 1 -and $_.Enabled -eq $true)
+                                 )
+                             ) -or 
+                             ($_.UserPrincipalName -like "$($workingUser.SIS_EMPNO)@*")
+                         )
+                     )
+             
+                 ) 
+             }
+            
+            Write-Host "$($AD_User.samAccountName) | $($workingUser.SIS_ID)"
+
+            if ($null -eq $AD_User)
+            {
+                Write-Host "NULL AD: $($AD_User.samAccountName) | $($workingUser.SIS_ID)"
+                Pause
+            }
+            #Validate the licencing if required
+            <#if ($handlingValidateLicencing -eq $true)
+            {
+                return $null
+            }#>
         }
+
        #Email Handling
        switch ($handlingEmail)
         {
             #1 = Use eduHub Email
-            1 
-                {
+            1   {
                     #Do nothing, using eduHub Email
                 }
             #2 = Calculate from eduHub Data (SIS_ID)@domain
@@ -256,15 +326,15 @@ Function Merge-User
                     }
                     $workingUser.E_MAIL = "$(($workingUser.SIS_ID).ToLower())@$schoolEmailDomain"
                 }
-            #3 = pull from Active Directory UPN
+            #3 = pull from Active Directory UPN - else fall back to mail - else fallback to eduhub
             3   {
                     
                 }
-            #4 = Pull from Active Directory Mail
+            #4 = Pull from Active Directory Mail - else fallback to eduhub
             4   {
                     
                 }
-            #5 = Pull from Active Directory ProxyAddresses looking for primary (Capital SMTP)
+            #5 = Pull from Active Directory ProxyAddresses looking for primary (Capital SMTP) - else fall back to mail - else fallback to eduhub
             5   {
                     
                 }
@@ -337,7 +407,7 @@ Function Merge-User
                     
                 }
             #7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub, fall back to SIS_ID
-            {7 -and $userStaff -eq $true}
+            {$_ -eq 7 -and $userStaff -eq $true}
 
                 {
                     if (-not [string]::IsNullOrWhiteSpace($workingUser.SIS_EMPNO))
@@ -389,7 +459,7 @@ Function Merge-User
                     
                 }
             #4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data
-            {4 -and $userStaff -eq $true}
+            {$_ -eq 4 -and $userStaff -eq $true}
 
                 {
                     if (-not [string]::IsNullOrWhiteSpace($workingUser.SIS_EMPNO))
@@ -439,32 +509,17 @@ Function Merge-User
 #Script Execution goes here
 #Log-Finish -LogPath $sLogFile
 
-###################### Import Config File If Specified ######################
-#Importing the Config file will overwrite the defaults with the config data, including blank and null values, if its declared it will be overwritten
-if (-not [string]::IsNullOrWhiteSpace($fileConfig))
-{
-    try 
-        {
-            Import-Module $fileConfig
-        }
-        catch
-        {
-            Write-Host "Cannot Load Config File, Exiting"
-            exit
-        }
-}
-
 ###################### Retrieve AD Users if Required ######################
 
-$handlingLicencingValue = "licencingOliver" #The attribute name for the licencing Data
-$handlingADStaffType = "employeeType" #The attribute name for stating whether its a staff user or not for imports, only important if $handlingCreateNonEduhub is true, needs to be "Staff" or "15" (as in UserCreator) otherwise will assume student
 $ADUsers = $null
 
-if ($handlingValidateLicencing -or $handlingCreateNonEduhub -or (($handlingStudentEmail -ge 3) -and ($handlingStudentEmail -le 5)) -or (($handlingStudentUsername -ge 3) -and ($handlingStudentUsername -le 5)) -or (($handlingStudentAlias -ge 2) -and ($handlingStudentAlias -le 3)) -or (($handlingStaffEmail -ge 3) -and ($handlingStaffEmail -le 6)) -or (($handlingStaffUsername -ge 3) -and ($handlingStaffUsername -le 6)) -or (($handlingStaffAlias -ge 2) -and ($handlingStaffAlias -le 3)))
+if ($handlingValidateLicencing -or -not $handlingExportNoUser -or (($handlingStudentEmail -ge 3) -and ($handlingStudentEmail -le 5)) -or (($handlingStudentUsername -ge 3) -and ($handlingStudentUsername -le 5)) -or (($handlingStudentAlias -ge 2) -and ($handlingStudentAlias -le 3)) -or (($handlingStaffEmail -ge 3) -and ($handlingStaffEmail -le 6)) -or (($handlingStaffUsername -ge 3) -and ($handlingStaffUsername -le 6)) -or (($handlingStaffAlias -ge 2) -and ($handlingStaffAlias -le 3)))
 {
+    $adCheck = $true
     try 
     {
         Import-Module ActiveDirectory
+        Write-Host "Activating Active Directory Module"
     }
     catch
     {
@@ -482,13 +537,15 @@ if ($handlingValidateLicencing -or $handlingCreateNonEduhub -or (($handlingStude
         exit
     }
 
-    <#try 
+    try 
     {
+
+       
         if ($runAsLoggedIn -eq $true)
         {
-            $ADUsers = Get-ADUser -Server $activeDirectoryServer -Properties employeeID -SearchBase "OU=Users,OU=Western Port Secondary College,DC=Curric,DC=Western-Port-SC,DC=wan" -Filter * | Sort-Object employeeID
+            $ADUsers = Get-ADUser -Server $activeDirectoryServer -Properties employeeID -Filter * | Sort-Object employeeID
         }
-        if ($runAsLoggedIn -eq $false)
+        <#if ($runAsLoggedIn -eq $false)
         {
             try
             {
@@ -501,12 +558,12 @@ if ($handlingValidateLicencing -or $handlingCreateNonEduhub -or (($handlingStude
             $schoolServiceCreds = Get-SavedCredentials_WithRequest "$PSScriptRoot\Credentials\schoolDC-$([Environment]::MachineName)-$([Environment]::UserName).crd" $activeDirectoryUser
             $schoolServiceCreds = new-object -typename System.Management.Automation.PSCredential -argumentlist $schoolServiceCreds.Username,$schoolServiceCreds.Password
             $ADUsers = Get-ADUser -Server $activeDirectoryServer -Properties employeeID -SearchBase "OU=Users,OU=Western Port Secondary College,DC=Curric,DC=Western-Port-SC,DC=wan" -Filter * -Credential $schoolServiceCreds | Sort-Object employeeID
-        }
+        }#>
     }
     catch 
     {
         
-    }#>
+    }
 
 }
 ######################Import and Process Students######################
@@ -538,7 +595,7 @@ else
 foreach ($student in $importedStudents)
 {
     $tempUser = $null
-    if ($null -ne ($tempUser = (Merge-User -workingUser $student -exitAfter $handlingStudentExitAfter -handlingEmail $handlingStudentEmail -handlingUsername $handlingStudentUsername -handlingAlias $handlingStudentAlias -handlingNoUser $handlingExportNoUser)))
+    if ($null -ne ($tempUser = (Merge-User -workingUser $student -exitAfter $handlingStudentExitAfter -handlingEmail $handlingStudentEmail -handlingUsername $handlingStudentUsername -handlingAlias $handlingStudentAlias)))
     {
         $workingStudents += $tempUser
     }
@@ -550,9 +607,6 @@ $importedStudents = $null #Explicitly destroy data to clear up resources
 
 $importedStaff = $null
 $workingStaff = @()
-
-#Get The Date, Put here so only done once for the run
-$currentDate = Get-Date
 
 #Import Staff from CSV(s) based upon settings
 
@@ -576,7 +630,7 @@ else
 #Process Staff
 foreach ($staff in $importedStaff)
 {
-    if ($null -ne ($tempUser = (Merge-User -workingUser $staff -exitAfter $handlingStaffExitAfter -handlingEmail $handlingStaffEmail -handlingUsername $handlingStaffUsername  -handlingAlias $handlingStaffAlias -handlingNoUser $handlingExportNoUser -userStaff )))
+    if ($null -ne ($tempUser = (Merge-User -workingUser $staff -exitAfter $handlingStaffExitAfter -handlingEmail $handlingStaffEmail -handlingUsername $handlingStaffUsername  -handlingAlias $handlingStaffAlias -userStaff )))
     {
         $workingStaff += $tempUser
     }
@@ -593,15 +647,15 @@ $workingFamilies = @()
 
 if ($includeDeltas -eq $true) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    $importedFamilies = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) (Join-Path -Path $fileLocation -ChildPath $importFileFamiliesDelta) "$PSScriptRoot\Cache\" "DFKEY") | Select-Object -Property DFKEY,EMAIL_A,MOBILE_A,EMAIL_B,MOBILE_B,HOMEKEY | Sort-Object -property DFKEY
+    $importedFamilies = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) (Join-Path -Path $fileLocation -ChildPath $importFileFamiliesDelta) "$PSScriptRoot\Cache\" "DFKEY") | Select-Object -Property DFKEY,E_MAIL_A,MOBILE_A,E_MAIL_B,MOBILE_B,HOMEKEY | Sort-Object -property DFKEY
 }
 else
 {
-    $importedFamilies = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) | Select-Object -Property DFKEY,EMAIL_A,MOBILE_A,EMAIL_B,MOBILE_B,HOMEKEY | Sort-Object -property DFKEY
+    $importedFamilies = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) | Select-Object -Property DFKEY,E_MAIL_A,MOBILE_A,E_MAIL_B,MOBILE_B,HOMEKEY | Sort-Object -property DFKEY
 }
 
 
-#Sort families so that only families where there is an active student are kept and that are due to be exported, then with an active family check to see if primary contact is contact B (A and C are left as A), if so change the details, Contact B is dropped on export
+#Sort families so that only families where there is an active student are kept and that are due to be exported, then with an active family check to see if primary contact is contact B (A and C are left as A), if so change the details, Contact B is dropped on export. If there use only the first record (usally the oldest student) to calculate this
 
 foreach ($family in $importedFamilies)
 {
@@ -611,9 +665,14 @@ foreach ($family in $importedFamilies)
         
         if ((($workingStudents | Where-Object {$_.FAMILY -eq $family.DFKEY} | Sort-Object -Property SIS_ID | select-object -First 1).CONTACT_A) -eq "B")
         {
-            $family.EMAIL_A = $family.EMAIL_B
+            $family.E_MAIL_A = $family.E_MAIL_B
             $family.MOBILE_A = $family.MOBILE_B
             Write-Host "Changing Contacts for $($family.DFKEY)"
+        }
+        elseif (((($workingStudents | Where-Object {$_.FAMILY -eq $family.DFKEY} | Sort-Object -Property SIS_ID | select-object -First 1).CONTACT_A) -eq "C") -and -not [string]::IsNullOrWhiteSpace($family.E_MAIL_B) -and $family.E_MAIL_B -ne $family.E_MAIL_A)
+        {
+            $family.E_MAIL_A += ";$($family.E_MAIL_B)"
+            Write-Host "Adding Secondary Email for $($family.DFKEY)"
         }
         
     }
