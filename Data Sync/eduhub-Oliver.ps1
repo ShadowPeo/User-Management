@@ -331,19 +331,28 @@ Function Merge-User
                 }
             #3 = pull from Active Directory UPN - else fall back to mail - else fallback to eduhub
             3   {
-                    
+                    if (-not [string]::IsNullOrWhiteSpace($AD_User.UserPrincipalName))
+                    {
+                        $workingUser.E_MAIL = $AD_User.UserPrincipalName
+                    }
                 }
             #4 = Pull from Active Directory Mail - else fallback to eduhub
             4   {
-                    
+                    if (-not [string]::IsNullOrWhiteSpace($AD_User.Mail))
+                    {
+                        $workingUser.E_MAIL = $AD_User.Mail
+                    }
                 }
             #5 = Pull from Active Directory ProxyAddresses looking for primary (Capital SMTP) - else fall back to mail - else fallback to eduhub
             5   {
                     
                 }
-            #6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from Active Directory, fall back to SIS_ID
+            #6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from Active Directory, fall back to eduHub
             6   {
-                    
+                    if (-not [string]::IsNullOrWhiteSpace($AD_User.EmployeeID))
+                    {
+                        $workingUser.E_MAIL = "$($AD_User.EmployeeID)@$schoolEmailDomain"
+                    }
                 }
             #7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub, fall back to SIS_ID
             {$_ -eq 7 -and $userStaff}
@@ -395,11 +404,17 @@ Function Merge-User
                 }
             #3 = pull from Active Directory UPN
             3   {
-                    
+                    if (-not [string]::IsNullOrWhiteSpace($AD_User.UserPrincipalName))
+                    {
+                        $workingUser.USERNAME = $AD_User.UserPrincipalName
+                    }
                 }
             #4 = Pull from Active Directory Mail
             4   {
-                    
+                    if (-not [string]::IsNullOrWhiteSpace($AD_User.Mail))
+                    {
+                        $workingUser.USERNAME = $AD_User.Mail
+                    }
                 }
             #5 = Pull from Active Directory ProxyAddresses looking for primary (Capital SMTP)
             5   {
@@ -407,7 +422,10 @@ Function Merge-User
                 }
             #6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from Active Directory, fall back to SIS_ID
             6   {
-                    
+                    if (-not [string]::IsNullOrWhiteSpace($AD_User.EmployeeID))
+                    {
+                        $workingUser.USERNAME = "$($AD_User.EmployeeID)@$schoolEmailDomain"
+                    }
                 }
             #7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub, fall back to SIS_ID
             {$_ -eq 7 -and $userStaff -eq $true}
@@ -455,11 +473,17 @@ Function Merge-User
                 }
             #2 = Use samAccountName from Active Directory
             2   {
-                    
+                    if (-not [string]::IsNullOrWhiteSpace($AD_User.samAccountName))
+                    {
+                        $workingUser.ALIAS = $AD_User.SamAccountName
+                    }
                 }
             #3 = Use employeeID from Active Directory
             3   {
-                    
+                    if (-not [string]::IsNullOrWhiteSpace($AD_User.EmployeeID))
+                    {
+                        $workingUser.ALIAS = $AD_User.EmployeeID
+                    }
                 }
             #4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data
             {$_ -eq 4 -and $userStaff -eq $true}

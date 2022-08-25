@@ -12,3 +12,9 @@ upn
 mail
 proxyAddresses
 employeeID
+
+SearchBase
+Proxy Address Lookup
+Properties Array for AD lookup if Licencing lookup turned on and value is present
+
+VALIDATE ALL AD LOOKUPS BAR SMTP AS ITS NOT IMPLEMENTED
