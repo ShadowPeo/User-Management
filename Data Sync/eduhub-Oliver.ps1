@@ -249,14 +249,17 @@ Function Merge-User
                                     ($ADUsers.samAccountName -notcontains $workingUser.SIS_ID) -and 
                                     ($ADUsers.employeeID -notcontains $workingUser.SIS_ID) -and
                                     (@($ADUsers.UserPrincipalName -like "$($workingUser.SIS_ID)@*").count -eq 0 )
-                                ) -or 
-                                ($userStaff -and 
+                                ) -and 
+                                ( 
+                                    -not $userStaff -or 
                                     (
-                                        ($ADUsers.samAccountName -notcontains $workingUser.SIS_EMPNO) -and
-                                        (@($ADUsers.UserPrincipalName -like "$($workingUser.SIS_EMPNO)@*").Count -eq 0 ) -and
-                                        ($ADUsers.employeeID -notcontains $workingUser.SIS_EMPNO)
+                                        $userStaff -and
+                                        (
+                                            ($ADUsers.samAccountName -notcontains $workingUser.SIS_EMPNO) -and
+                                            (@($ADUsers.UserPrincipalName -like "$($workingUser.SIS_EMPNO)@*").Count -eq 0 ) -and
+                                            ($ADUsers.employeeID -notcontains $workingUser.SIS_EMPNO)
+                                        )
                                     )
-
                                 )
                             )
                         )
@@ -601,7 +604,7 @@ foreach ($student in $importedStudents)
     }
 }
 
-$importedStudents = $null #Explicitly destroy data to clear up resources
+#$importedStudents = $null #Explicitly destroy data to clear up resources
 
 ###################### Import and Process Staff ######################
 
@@ -636,7 +639,7 @@ foreach ($staff in $importedStaff)
     }
 }
 
-$importedStaff = $null #Explicitly destroy data to clear up resources
+#$importedStaff = $null #Explicitly destroy data to clear up resources
 
 ###################### Import and Process Families ######################
 
