@@ -30,21 +30,21 @@ param
         [float]$handlingStaffExitAfter = 365, #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left staff, -1 will always export them
         [int]$handlingFileYearLevel = 1, # 1 = Static (use the one from cache, if not exist cache copy and us as literal) 2 = Use Literal, description will e exported exactly as is. 3 = Pad the year numbers (if they exist) in the description field
         [boolean]$handlingIncludeFutures = $true, #Include Future Students
-        [int]$handlingStudentEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP)
+        [int]$handlingStudentEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID
         [int]$handlingStaffEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
-        [float]$handlingStudentUsername = 1, #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName
-        [float]$handlingStaffUsername = 1, #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 Use samAccountName, 6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
+        [float]$handlingStudentUsername = 5, #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP), 6 = Use samAccountName, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID
+        [float]$handlingStaffUsername = 5, #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP), 6 = Use samAccountName, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 8 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
         [int]$handlingStudentAlias = 1, #1 = SIS_ID, 2= use samAccountName - Fall back to SIS_ID, 3 = Use employeeID from Active Directory - Fall back to SIS_ID
         [int]$handlingStaffAlias = 1, #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
-        [boolean]$handlingValidateLicencing = $false, #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled or where no user exists 
-        [string]$handlingLicencingValue = "licencingOliver", #The attribute name for the licencing Data
+        [boolean]$handlingValidateLicencing = $false, #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled or where no user exists NOTE: This does not  validating the licencing value, only that the field is not blank
+        [string]$handlingLicencingValue = "licencingLibrary", #The attribute name for the licencing Data NOTE: Ensure the AD schema value exists before running or you will get a silent error
         [boolean]$handlingExportNoUser = $false, #Export user if there is no matching username in AD, if AD lookup is in use
 
         #Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SIS_ID) or in the case of staff members PAYROLL_REC_NO/SIS_EMPNO Matches will also be based upon email matching UPN
-        [boolean]$runAsLoggedIn = $true,
-        [string]$activeDirectoryUser = $null, #Username to connect to AD as, will prompt for password if credentials do not exist or are incorrect, not used if not running as logged in user
+        [boolean]$runAsLoggedIn = $false,
+        [string]$activeDirectoryUser = "CURRIC\da.st00605", #Username to connect to AD as, will prompt for password if credentials do not exist or are incorrect, not used if not running as logged in user
         [string]$activeDirectoryServer = "10.128.136.35", #DNS Name or IP of AD Server
-        [string]$activeDirectorySearchBase = $null, #DNS Name or IP of AD Server
+        [string]$activeDirectorySearchBase = "OU=User Accounts,OU=Accounts,OU=3432 - Mount Waverley PS,DC=curric,DC=mount-waverley-ps,DC=wan", #DNS Name or IP of AD Server
 
         #Log File Info
         [string]$sLogPath = "C:\Windows\Temp",
@@ -306,11 +306,13 @@ Function Merge-User
                 Write-Host "NULL AD: $($AD_User.samAccountName) | $($workingUser.SIS_ID)"
                 Pause
             }
+
             #Validate the licencing if required
-            <#if ($handlingValidateLicencing -eq $true)
+            if ($handlingValidateLicencing -eq $true -and [string]::IsNullOrWhiteSpace($AD_User.$handlingLicencingValue))
             {
+                Write-Host "Dropping User $($workingUser.SIS_ID) as licencing check fails"
                 return $null
-            }#>
+            }
         }
 
        #Email Handling
@@ -345,7 +347,10 @@ Function Merge-User
                 }
             #5 = Pull from Active Directory ProxyAddresses looking for primary (Capital SMTP) - else fall back to mail - else fallback to eduhub
             5   {
-                    
+                    if (-not [string]::IsNullOrWhiteSpace($AD_User.proxyAddresses -clike "SMTP:*"))
+                    {
+                        $workingUser.E_MAIL = ((($AD_User.proxyAddresses -clike "SMTP:*")[0]).SubString(5)).ToLower()
+                    }
                 }
             #6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from Active Directory, fall back to eduHub
             6   {
@@ -418,17 +423,35 @@ Function Merge-User
                 }
             #5 = Pull from Active Directory ProxyAddresses looking for primary (Capital SMTP)
             5   {
-                    
-                }
-            #6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from Active Directory, fall back to SIS_ID
-            6   {
-                    if (-not [string]::IsNullOrWhiteSpace($AD_User.EmployeeID))
+                    if (-not [string]::IsNullOrWhiteSpace($AD_User.proxyAddresses -clike "SMTP:*"))
                     {
-                        $workingUser.USERNAME = "$($AD_User.EmployeeID)@$schoolEmailDomain"
+                        $workingUser.USERNAME = ((($AD_User.proxyAddresses -clike "SMTP:*")[0]).SubString(5)).ToLower()
+                    }
+                    elseif(-not [string]::IsNullOrWhiteSpace($AD_User.Mail))
+                    {
+                        $workingUser.USERNAME = $AD_User.Mail
+                    }
+                    else
+                    {
+                        $workingUser.USERNAME = ($workingUser.SIS_ID).ToUpper()
                     }
                 }
-            #7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub, fall back to SIS_ID
-            {$_ -eq 7 -and $userStaff -eq $true}
+            #6 = samAccountName
+            6   {
+                    if (-not [string]::IsNullOrWhiteSpace($AD_User.SamAccountName))
+                    {
+                        $workingUser.USERNAME = $AD_User.SamAccountName
+                    }
+                }
+            #7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from Active Directory, fall back to SIS_ID
+            7   {
+                    if (-not [string]::IsNullOrWhiteSpace($AD_User.EmployeeID))
+                    {
+                        $workingUser.USERNAME = "$($AD_User.EmployeeID)"
+                    }
+                }
+            #8 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub, fall back to SIS_ID
+            {$_ -eq 8 -and $userStaff -eq $true}
 
                 {
                     if (-not [string]::IsNullOrWhiteSpace($workingUser.SIS_EMPNO))
@@ -558,38 +581,73 @@ if ($handlingValidateLicencing -or -not $handlingExportNoUser -or (($handlingStu
         Write-Host "Active Directory use is required, but no server is specfied"
         exit
     }
-    if ([string]::IsNullOrWhiteSpace($activeDirectoryUser) -and $runAsLoggedIn -eq $false)
-    {
-        Write-Host "Active Directory use is required, but no credentials are specfied and running as logged in user is disabled"
-        exit
-    }
 
     try 
     {
-
-       
-        if ($runAsLoggedIn -eq $true)
-        {
-            $ADUsers = Get-ADUser -Server $activeDirectoryServer -Properties employeeID -Filter * | Sort-Object employeeID
+        #Create Splat
+        $Splat = @{
+            Filter = '*'
+            Server = $activeDirectoryServer
         }
-        <#if ($runAsLoggedIn -eq $false)
+
+        $adPropertiesList = @(
+            "employeeID"
+            "Mail"
+            "ProxyAddresses"
+        )
+
+        #If licencing check is turned on and the value for the licencing variable is not blank then add it to the properties array
+        if ($handlingValidateLicencing -and -not [string]::IsNullOrWhiteSpace($handlingLicencingValue))
+        {
+            $adPropertiesList += $handlingLicencingValue
+        }
+        #If licencing check is turned on and the value for the licencing variable is blank then error out
+        elseif ($handlingValidateLicencing -and [string]::IsNullOrWhiteSpace($handlingLicencingValue))
+        {
+            Write-Host "Told to Validate Licencing but no AD field with licencing Value specified, Exiting"
+            exit
+        }
+        
+        #Add Properties Array to Splat now that it is calculated        
+        $Splat.Properties = $adPropertiesList
+
+        #Check if there is a Search Base set, if so add it to the splat
+
+        if (-not [string]::IsNullOrWhiteSpace($activeDirectorySearchBase))
+        {
+            $Splat.SearchBase = $activeDirectorySearchBase
+        }
+
+        if ($runAsLoggedIn -eq $false)
         {
             try
             {
-                Import-Module "$PSScriptRoot\Modules\Authentication.ps1"
+                Write-Host "Attempting to import Authentication Module"
+                Import-Module "$PSScriptRoot\Modules\Authentication.psm1"
             }
             catch
             {
-                throw "Cannot Import Authentication Module"
+                Write-Host "Cannot Import Authentication Module"
             }
-            $schoolServiceCreds = Get-SavedCredentials_WithRequest "$PSScriptRoot\Credentials\schoolDC-$([Environment]::MachineName)-$([Environment]::UserName).crd" $activeDirectoryUser
-            $schoolServiceCreds = new-object -typename System.Management.Automation.PSCredential -argumentlist $schoolServiceCreds.Username,$schoolServiceCreds.Password
-            $ADUsers = Get-ADUser -Server $activeDirectoryServer -Properties employeeID -SearchBase "OU=Users,OU=Western Port Secondary College,DC=Curric,DC=Western-Port-SC,DC=wan" -Filter * -Credential $schoolServiceCreds | Sort-Object employeeID
-        }#>
+            
+            if ([string]::IsNullOrWhiteSpace($activeDirectoryUser))
+            {
+                Write-Host "Active Directory use is required, but no credentials are specfied and running as logged in user is disabled"
+                exit
+            }
+
+            #$schoolServiceCreds = Get-SavedCredentials_WithRequest "$PSScriptRoot\Credentials\schoolDC-$([Environment]::MachineName)-$([Environment]::UserName).crd" $activeDirectoryUser
+            #$schoolServiceCreds = new-object -typename System.Management.Automation.PSCredential -argumentlist $schoolServiceCreds.Username,$schoolServiceCreds.Password
+            #$Splat.Credentials = $schoolServiceCreds
+
+        }
+
+        $ADUsers = Get-ADUser @Splat | Sort-Object samAccountName
     }
     catch 
     {
-        
+        Write-Output "Error with AD Query, Exiting"
+        exit
     }
 
 }
@@ -628,7 +686,7 @@ foreach ($student in $importedStudents)
     }
 }
 
-#$importedStudents = $null #Explicitly destroy data to clear up resources
+$importedStudents = $null #Explicitly destroy data to clear up resources
 
 ###################### Import and Process Staff ######################
 
@@ -663,7 +721,7 @@ foreach ($staff in $importedStaff)
     }
 }
 
-#$importedStaff = $null #Explicitly destroy data to clear up resources
+$importedStaff = $null #Explicitly destroy data to clear up resources
 
 ###################### Import and Process Families ######################
 
