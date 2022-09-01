@@ -4,13 +4,10 @@ param
     (
         
         #School Details
-        [string]$schoolID = "3432", # Used for export and for import if using CASES File Names
         #$schoolID = [system.environment]::MachineName.Trim().Substring(0,4)
 
-        [string]$schoolEmailDomain = "mwps.vic.edu.au", #Only used if processing emails or users from CASES Data
 
         #File Settings
-        [boolean]$modifiedHeaders = $false, #Use Modified Export Headers (from export script in this Repo), if not it will look for standard eduHub headers
         [boolean]$includeDeltas = $true, #Include eduHub Delta File
 
         #File Locations
@@ -32,19 +29,20 @@ param
         [boolean]$handlingIncludeFutures = $true, #Include Future Students
         [int]$handlingStudentEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID
         [int]$handlingStaffEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
-        [float]$handlingStudentUsername = 5, #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP), 6 = Use samAccountName, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID
-        [float]$handlingStaffUsername = 5, #-1 = Exclude from Export, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP), 6 = Use samAccountName, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 8 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
+        [float]$handlingStudentUsername = 5, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP), 6 = Use samAccountName, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID
+        [float]$handlingStaffUsername = 5, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP), 6 = Use samAccountName, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 8 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
         [int]$handlingStudentAlias = 1, #1 = SIS_ID, 2= use samAccountName - Fall back to SIS_ID, 3 = Use employeeID from Active Directory - Fall back to SIS_ID
         [int]$handlingStaffAlias = 1, #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
         [boolean]$handlingValidateLicencing = $false, #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled or where no user exists NOTE: This does not  validating the licencing value, only that the field is not blank
         [string]$handlingLicencingValue = "licencingLibrary", #The attribute name for the licencing Data NOTE: Ensure the AD schema value exists before running or you will get a silent error
         [boolean]$handlingExportNoUser = $false, #Export user if there is no matching username in AD, if AD lookup is in use
+        [boolean]$exportFull = $true, #Include all columns from eduhub in export, blanking those not required
 
         #Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SIS_ID) or in the case of staff members PAYROLL_REC_NO/SIS_EMPNO Matches will also be based upon email matching UPN
-        [boolean]$runAsLoggedIn = $false,
+        [boolean]$runAsLoggedIn = $true,
         [string]$activeDirectoryUser = "CURRIC\da.st00605", #Username to connect to AD as, will prompt for password if credentials do not exist or are incorrect, not used if not running as logged in user
-        [string]$activeDirectoryServer = "10.128.136.35", #DNS Name or IP of AD Server
-        [string]$activeDirectorySearchBase = "OU=User Accounts,OU=Accounts,OU=3432 - Mount Waverley PS,DC=curric,DC=mount-waverley-ps,DC=wan", #DNS Name or IP of AD Server
+        [string]$activeDirectoryServer = "10.124.224.137", #DNS Name or IP of AD Server
+        [string]$activeDirectorySearchBase = "OU=Users,OU=Western Port Secondary College,DC=Curric,DC=Western-Port-SC,DC=wan", #DNS Name or IP of AD Server
 
         #Log File Info
         [string]$sLogPath = "C:\Windows\Temp",
@@ -120,6 +118,88 @@ $sLogFile = Join-Path -Path $sLogPath -ChildPath $sLogName
 #Date
 $currentDate = Get-Date
 $adCheck = $false #Changes to true if one of the settings requires an AD Check
+
+#Variables for Output Blanking - The SIS_ID (STKEY/SFKEY) are always exported. All fields are imported and processed for ease of programming, its only at the output the the fields will be dropped
+#Comment out by putting # at the start of the line which fields you do not want to export, do this carefully as it may have unintended concequences
+
+$fieldsStudent = @(
+                    'STKEY'
+                    'PREF_NAME'
+                    'FIRST_NAME'
+                    'SURNAME'
+                    'BIRTHDATE'
+                    'GENDER'
+                    'EXIT_DATE'
+                    'HOME_GROUP'
+                    'SCHOOL_YEAR'
+                    'FAMILY'            #Used to lookup family details, to get parent and address details
+                    'E_MAIL'
+                    'MOBILE'
+                    'SECOND_NAME'
+                    'STATUS'    
+                    'USERNAME'          #Allow this if you want to use the username field
+                    'ALIAS'
+)
+
+$fieldsStaff = @(
+                    'SFKEY'
+                    'PREF_NAME'
+                    'FIRST_NAME'
+                    'SURNAME'
+                    'BIRTHDATE'
+                    'GENDER'
+                    'FINISH'
+                    'HOMEKEY'           #Used to lookup address details, to get home address details
+                    'E_MAIL'
+                    'MAILKEY'           #Used to lookup address details, to get mailing address details
+                    'PAYROLL_REC_NO'
+                    'SECOND_NAME'
+                    'TITLE'
+                    'MOBILE'
+                    'WORK_PHONE'
+                    'STAFF_STATUS'
+#                    'USERNAME'          #Allow this if you want to use the username field
+                    'ALIAS'
+)
+
+$fieldsFamily = @(
+                    'DFKEY'
+                    'E_MAIL_A'
+                    'MOBILE_A'
+                    'HOMEKEY'
+)
+
+$fieldsAddress = @(
+                    'UMKEY'
+                    'ADDRESS01'
+                    'ADDRESS02'
+                    'ADDRESS03'
+                    'STATE'
+                    'POSTCODE'
+                    'TELEPHONE'
+                    'MOBILE'
+)
+
+$fieldsYearLevel = @(
+                    'SFKEY'
+                    'PREF_NAME'
+                    'FIRST_NAME'
+                    'SURNAME'
+                    'BIRTHDATE'
+                    'GENDER'
+                    'FINISH'
+                    'HOMEKEY'           #Used to lookup address details, to get home address details
+                    'E_MAIL'
+                    'MAILKEY'           #Used to lookup address details, to get mailing address details
+                    'PAYROLL_REC_NO'
+                    'SECOND_NAME'
+                    'TITLE'
+                    'MOBILE'
+                    'WORK_PHONE'
+                    'STAFF_STATUS'
+#                    'USERNAME'          #Allow this if you want to use the username field
+                    'ALIAS'
+)
 
 #-----------------------------------------------------------[Functions]------------------------------------------------------------
 
@@ -378,162 +458,163 @@ Function Merge-User
                 }
         }
 
-        #Username Handling
-        switch ($handlingUsername)
+        if(($userStaff -eq $false -and $fieldsStudent.Contains("USERNAME")) -or ($userStaff -eq $true -and $fieldsStaff.Contains("USERNAME")))
         {
-            #-1 = Excluded Column on Export
-            -1 
-                {
-                    $workingUser.USERNAME = "EXCLUDED"
-                }
-            #0 = Blank the field ""
-            0 
-                {
-                    $workingUser.USERNAME = ""
-                }
-            #1 = Use eduHub Key
-            1 
-                {
-                   $workingUser.USERNAME = ($workingUser.SIS_ID).ToUpper()
-                }
-            #2 = Calculate from eduHub Data (SIS_ID)@domain
-            2   {
-                    if ([string]::IsNullOrWhiteSpace($schoolEmailDomain))
+            #Username Handling
+            switch ($handlingUsername)
+            {
+                #0 = Blank the field ""
+                0 
                     {
-                        Write-Host "Email Domain Blank but told to use in settings, exiting"
-                        exit
+                        $workingUser.USERNAME = ""
                     }
+                #1 = Use eduHub Key
+                1 
+                    {
+                       $workingUser.USERNAME = ($workingUser.SIS_ID).ToUpper()
+                    }
+                #2 = Calculate from eduHub Data (SIS_ID)@domain
+                2   {
+                        if ([string]::IsNullOrWhiteSpace($schoolEmailDomain))
+                        {
+                            Write-Host "Email Domain Blank but told to use in settings, exiting"
+                            exit
+                        }
 
-                    $workingUser.USERNAME = "$(($workingUser.SIS_ID).ToLower())@$schoolEmailDomain"
+                        $workingUser.USERNAME = "$(($workingUser.SIS_ID).ToLower())@$schoolEmailDomain"
 
-                }
-            #3 = pull from Active Directory UPN
-            3   {
-                    if (-not [string]::IsNullOrWhiteSpace($AD_User.UserPrincipalName))
-                    {
-                        $workingUser.USERNAME = $AD_User.UserPrincipalName
                     }
-                }
-            #4 = Pull from Active Directory Mail
-            4   {
-                    if (-not [string]::IsNullOrWhiteSpace($AD_User.Mail))
-                    {
-                        $workingUser.USERNAME = $AD_User.Mail
+                #3 = pull from Active Directory UPN
+                3   {
+                        if (-not [string]::IsNullOrWhiteSpace($AD_User.UserPrincipalName))
+                        {
+                            $workingUser.USERNAME = $AD_User.UserPrincipalName
+                        }
                     }
-                }
-            #5 = Pull from Active Directory ProxyAddresses looking for primary (Capital SMTP)
-            5   {
-                    if (-not [string]::IsNullOrWhiteSpace($AD_User.proxyAddresses -clike "SMTP:*"))
-                    {
-                        $workingUser.USERNAME = ((($AD_User.proxyAddresses -clike "SMTP:*")[0]).SubString(5)).ToLower()
+                #4 = Pull from Active Directory Mail
+                4   {
+                        if (-not [string]::IsNullOrWhiteSpace($AD_User.Mail))
+                        {
+                            $workingUser.USERNAME = $AD_User.Mail
+                        }
                     }
-                    elseif(-not [string]::IsNullOrWhiteSpace($AD_User.Mail))
-                    {
-                        $workingUser.USERNAME = $AD_User.Mail
+                #5 = Pull from Active Directory ProxyAddresses looking for primary (Capital SMTP)
+                5   {
+                        if (-not [string]::IsNullOrWhiteSpace($AD_User.proxyAddresses -clike "SMTP:*"))
+                        {
+                            $workingUser.USERNAME = ((($AD_User.proxyAddresses -clike "SMTP:*")[0]).SubString(5)).ToLower()
+                        }
+                        elseif(-not [string]::IsNullOrWhiteSpace($AD_User.Mail))
+                        {
+                            $workingUser.USERNAME = $AD_User.Mail
+                        }
+                        else
+                        {
+                            $workingUser.USERNAME = ($workingUser.SIS_ID).ToUpper()
+                        }
                     }
-                    else
-                    {
-                        $workingUser.USERNAME = ($workingUser.SIS_ID).ToUpper()
+                #6 = samAccountName
+                6   {
+                        if (-not [string]::IsNullOrWhiteSpace($AD_User.SamAccountName))
+                        {
+                            $workingUser.USERNAME = $AD_User.SamAccountName
+                        }
                     }
-                }
-            #6 = samAccountName
-            6   {
-                    if (-not [string]::IsNullOrWhiteSpace($AD_User.SamAccountName))
-                    {
-                        $workingUser.USERNAME = $AD_User.SamAccountName
+                #7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from Active Directory, fall back to SIS_ID
+                7   {
+                        if (-not [string]::IsNullOrWhiteSpace($AD_User.EmployeeID))
+                        {
+                            $workingUser.USERNAME = "$($AD_User.EmployeeID)"
+                        }
                     }
-                }
-            #7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from Active Directory, fall back to SIS_ID
-            7   {
-                    if (-not [string]::IsNullOrWhiteSpace($AD_User.EmployeeID))
-                    {
-                        $workingUser.USERNAME = "$($AD_User.EmployeeID)"
-                    }
-                }
-            #8 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub, fall back to SIS_ID
-            {$_ -eq 8 -and $userStaff -eq $true}
+                #8 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub, fall back to SIS_ID
+                {$_ -eq 8 -and $userStaff -eq $true}
 
-                {
-                    if (-not [string]::IsNullOrWhiteSpace($workingUser.SIS_EMPNO))
                     {
-                        $workingUser.USERNAME = $workingUser.SIS_EMPNO
+                        if (-not [string]::IsNullOrWhiteSpace($workingUser.SIS_EMPNO))
+                        {
+                            $workingUser.USERNAME = $workingUser.SIS_EMPNO
+                        }
+                        else
+                        {
+                            $workingUser.USERNAME = $workingUser.SIS_ID
+                        }
                     }
-                    else
+                #Default = Use eduHub Key (SIS_ID)
+                default 
                     {
-                        $workingUser.USERNAME = $workingUser.SIS_ID
+                        if (-not $userStaff)
+                        {
+                            $workingUser.USERNAME = ($workingUser.SIS_ID).ToUpper()
+                        }
+                        else
+                        {
+                            $workingUser.USERNAME = ($workingUser.SIS_ID).ToUpper()
+                        }
                     }
-                }
-            #Default = Use eduHub Key (SIS_ID)
-            default 
-                {
-                    if (-not $userStaff)
-                    {
-                        $workingUser.USERNAME = ($workingUser.SIS_ID).ToUpper()
-                    }
-                    else
-                    {
-                        $workingUser.USERNAME = ($workingUser.SIS_ID).ToUpper()
-                    }
-                }
+            }
         }
 
         #Alias Handling
-
-        switch ($handlingAlias)
+        if(($userStaff -eq $false -and $fieldsStudent.Contains("ALIAS")) -or ($userStaff -eq $true -and $fieldsStaff.Contains("ALIAS")))
         {
+            switch ($handlingAlias)
+            {
 
-            #1 = Use eduHub Key (SIS_ID)
-            1 
-                {
-                    if (-not $userStaff)
+                #1 = Use eduHub Key (SIS_ID)
+                1 
                     {
-                        $workingUser.ALIAS = ($workingUser.SIS_ID).ToUpper()
+                        if (-not $userStaff)
+                        {
+                            $workingUser.ALIAS = ($workingUser.SIS_ID).ToUpper()
+                        }
+                        else
+                        {
+                            $workingUser.ALIAS = ($workingUser.SIS_ID).ToUpper()
+                        }
                     }
-                    else
-                    {
-                        $workingUser.ALIAS = ($workingUser.SIS_ID).ToUpper()
+                #2 = Use samAccountName from Active Directory
+                2   {
+                        if (-not [string]::IsNullOrWhiteSpace($AD_User.samAccountName))
+                        {
+                            $workingUser.ALIAS = $AD_User.SamAccountName
+                        }
                     }
-                }
-            #2 = Use samAccountName from Active Directory
-            2   {
-                    if (-not [string]::IsNullOrWhiteSpace($AD_User.samAccountName))
-                    {
-                        $workingUser.ALIAS = $AD_User.SamAccountName
+                #3 = Use employeeID from Active Directory
+                3   {
+                        if (-not [string]::IsNullOrWhiteSpace($AD_User.EmployeeID))
+                        {
+                            $workingUser.ALIAS = $AD_User.EmployeeID
+                        }
                     }
-                }
-            #3 = Use employeeID from Active Directory
-            3   {
-                    if (-not [string]::IsNullOrWhiteSpace($AD_User.EmployeeID))
-                    {
-                        $workingUser.ALIAS = $AD_User.EmployeeID
-                    }
-                }
-            #4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data
-            {$_ -eq 4 -and $userStaff -eq $true}
+                #4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data
+                {$_ -eq 4 -and $userStaff -eq $true}
 
-                {
-                    if (-not [string]::IsNullOrWhiteSpace($workingUser.SIS_EMPNO))
                     {
-                        $workingUser.ALIAS = $workingUser.SIS_EMPNO
+                        if (-not [string]::IsNullOrWhiteSpace($workingUser.SIS_EMPNO))
+                        {
+                            $workingUser.ALIAS = $workingUser.SIS_EMPNO
+                        }
+                        else
+                        {
+                            $workingUser.ALIAS = $workingUser.SIS_ID
+                        }
                     }
-                    else
+                #Default = Use eduHub Key (SIS_ID)
+                default 
                     {
-                        $workingUser.ALIAS = $workingUser.SIS_ID
+                        if (-not $userStaff)
+                        {
+                            $workingUser.ALIAS = ($workingUser.SIS_ID).ToUpper()
+                        }
+                        else
+                        {
+                            $workingUser.ALIAS = ($workingUser.SIS_ID).ToUpper()
+                        }
                     }
-                }
-            #Default = Use eduHub Key (SIS_ID)
-            default 
-                {
-                    if (-not $userStaff)
-                    {
-                        $workingUser.ALIAS = ($workingUser.SIS_ID).ToUpper()
-                    }
-                    else
-                    {
-                        $workingUser.ALIAS = ($workingUser.SIS_ID).ToUpper()
-                    }
-                }
+            }
         }
+
         return $workingUser
 
     }
@@ -585,7 +666,7 @@ if ($handlingValidateLicencing -or -not $handlingExportNoUser -or (($handlingStu
     try 
     {
         #Create Splat
-        $Splat = @{
+        $activeDirectorySplat = @{
             Filter = '*'
             Server = $activeDirectoryServer
         }
@@ -609,13 +690,13 @@ if ($handlingValidateLicencing -or -not $handlingExportNoUser -or (($handlingStu
         }
         
         #Add Properties Array to Splat now that it is calculated        
-        $Splat.Properties = $adPropertiesList
+        $activeDirectorySplat.Properties = $adPropertiesList
 
         #Check if there is a Search Base set, if so add it to the splat
 
         if (-not [string]::IsNullOrWhiteSpace($activeDirectorySearchBase))
         {
-            $Splat.SearchBase = $activeDirectorySearchBase
+            $activeDirectorySplat.SearchBase = $activeDirectorySearchBase
         }
 
         if ($runAsLoggedIn -eq $false)
@@ -638,11 +719,11 @@ if ($handlingValidateLicencing -or -not $handlingExportNoUser -or (($handlingStu
 
             #$schoolServiceCreds = Get-SavedCredentials_WithRequest "$PSScriptRoot\Credentials\schoolDC-$([Environment]::MachineName)-$([Environment]::UserName).crd" $activeDirectoryUser
             #$schoolServiceCreds = new-object -typename System.Management.Automation.PSCredential -argumentlist $schoolServiceCreds.Username,$schoolServiceCreds.Password
-            #$Splat.Credentials = $schoolServiceCreds
+            #$activeDirectorySplat.Credentials = $schoolServiceCreds
 
         }
 
-        $ADUsers = Get-ADUser @Splat | Sort-Object samAccountName
+        $ADUsers = Get-ADUser @activeDirectorySplat | Sort-Object samAccountName
     }
     catch 
     {
@@ -658,31 +739,44 @@ $workingStudents = @()
 
 #Import Students from CSV(s) based upon settings
 
-if ($includeDeltas -eq $true -and $modifiedHeaders -eq $false) #Only do Delta join if not using files from exporter as exporter joins the files
+if ($includeDeltas -eq $true) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    $importedStudents = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileStudents) (Join-Path -Path $fileLocation -ChildPath $importFileStudentsDelta) "$PSScriptRoot\Cache\" "STKEY")  | Select-Object -Property  @{Name="SIS_ID";Expression={$_."STKEY"}},PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,@{Name="FINISH";Expression={$_."EXIT_DATE"}},HOME_GROUP,SCHOOL_YEAR,FAMILY,USERNAME,E_MAIL,CONTACT_A,STATUS,ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
+    $importedStudents = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileStudents) (Join-Path -Path $fileLocation -ChildPath $importFileStudentsDelta) "$PSScriptRoot\Cache\" "STKEY")  | Sort-Object -property STATUS, STKEY
 }
-elseif ($includeDeltas -eq $false -and $modifiedHeaders -eq $false) #Only Run import if not using modified headers from exporter
+elseif ($includeDeltas -eq $false) #Only Run import if not using modified headers from exporter
 {
-    $importedStudents = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStudents) | Select-Object -Property  @{Name="SIS_ID";Expression={$_."STKEY"}},PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,@{Name="FINISH";Expression={$_."EXIT_DATE"}},HOME_GROUP,SCHOOL_YEAR,FAMILY,USERNAME,E_MAIL,CONTACT_A,STATUS,ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
-}
-elseif ($modifiedHeaders -eq $true)
-{
-    $importedStudents = (Join-Path -Path $fileLocation -ChildPath $importFileStudents) | Select-Object -Property  SIS_ID,PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,FINISH,HOME_GROUP,SCHOOL_YEAR,FAMILY,USERNAME,E_MAIL,CONTACT_A,STATUS,ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
+    $importedStudents = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStudents) | Sort-Object -property STATUS, STKEY
 }
 else
 {
     throw "Cannot Import Error with locating or processing files"
 }
 
-#Process Students
 
+#Handle eduHub headers vs required headers
+$headersStudent = $null
+$headersStudent = (($importedStudents | Select-Object -First 1).psobject.properties).Name
+$importedStudents = $importedStudents | Select-Object ($fieldsStudent + @("CONTACT_A")) #Selecting only required fields and adding Contact_A for family/address processing
+
+#Alias keys for processing
+$importedStudents = $importedStudents | Add-Member -MemberType AliasProperty -Name SIS_ID -Value STKEY -PassThru | Add-Member -MemberType AliasProperty -Name FINISH -Value EXIT_DATE -PassThru
+
+#Process Students
 foreach ($student in $importedStudents)
 {
     $tempUser = $null
     if ($null -ne ($tempUser = (Merge-User -workingUser $student -exitAfter $handlingStudentExitAfter -handlingEmail $handlingStudentEmail -handlingUsername $handlingStudentUsername -handlingAlias $handlingStudentAlias)))
     {
         $workingStudents += $tempUser
+    }
+}
+
+#Merge non-eduhub fields into end of eduhub headers if they are required
+foreach ($field in $fieldsStudent)
+{
+    if ($headersStudent -notcontains $field)
+    {
+        $headersStudent += $field
     }
 }
 
@@ -695,22 +789,26 @@ $workingStaff = @()
 
 #Import Staff from CSV(s) based upon settings
 
-if ($includeDeltas -eq $true -and $modifiedHeaders -eq $false) #Only do Delta join if not using files from exporter as exporter joins the files
+if ($includeDeltas -eq $true) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    $importedStaff = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileStaff)(Join-Path -Path $fileLocation -ChildPath $importFileStaffDelta) "$PSScriptRoot\Cache\" "SFKEY")  | Select-Object -Property @{Name="SIS_ID";Expression={$_."SFKEY"}},PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,FINISH,HOMEKEY,USERNAME,E_MAIL,@{Name="STATUS";Expression={$_."STAFF_STATUS"}},@{Name="SIS_EMPNO";Expression={$_."PAYROLL_REC_NO"}},ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
+    $importedStaff = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileStaff)(Join-Path -Path $fileLocation -ChildPath $importFileStaffDelta) "$PSScriptRoot\Cache\" "SFKEY")  | Sort-Object -property STAFF_STATUS, SFKEY
 }
-elseif ($includeDeltas -eq $false -and $modifiedHeaders -eq $false) #Only Run import if not using modified headers from exporter
+elseif ($includeDeltas -eq $false) #Only Run import if not using modified headers from exporter
 {
-    $importedStaff = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStaff) | Select-Object -Property @{Name="SIS_ID";Expression={$_."SFKEY"}},PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,FINISH,HOMEKEY,USERNAME,E_MAIL,@{Name="STATUS";Expression={$_."STAFF_STATUS"}},@{Name="SIS_EMPNO";Expression={$_."PAYROLL_REC_NO"}},ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
-}
-elseif ($modifiedHeaders -eq $true)
-{
-    $importedStaff = (Join-eduHubDelta $fileStaff $fileStaffDelta "SIS_ID") | Select-Object -Property SIS_ID,PREF_NAME,FIRST_NAME,SURNAME,BIRTHDATE,GENDER,FINISH,HOMEKEY,USERNAME,E_MAIL,STATUS,SIS_EMPNO,ALIAS,EXPORT | Sort-Object -property STATUS, SIS_ID
+    $importedStaff = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStaff) | Sort-Object -property STAFF_STATUS, SFKEY
 }
 else
 {
     throw "Cannot Import Error with locating or processing files"
 }
+
+#Handle eduHub headers vs required headers
+$headersStaff = $null
+$headersStaff = (($importedStaff |Select-Object -First 1).psobject.properties).Name
+$importedStaff = $importedStaff | Select-Object $fieldsStaff #Selecting only required fields 
+
+#Alias keys for data processing
+$importedStaff = $importedStaff | Add-Member -MemberType AliasProperty -Name SIS_ID -Value SFKEY -PassThru | Add-Member -MemberType AliasProperty -Name STATUS -Value STAFF_STATUS -PassThru | Add-Member -MemberType AliasProperty -Name SIS_EMPNO -Value PAYROLL_REC_NO -PassThru
 
 #Process Staff
 foreach ($staff in $importedStaff)
@@ -721,7 +819,19 @@ foreach ($staff in $importedStaff)
     }
 }
 
+#Merge non-eduhub fields into end of eduhub headers if they are required
+foreach ($field in $fieldsStaff)
+{
+    if ($headersStaff -notcontains $field)
+    {
+        $headersStaff += $field
+    }
+}
+
 $importedStaff = $null #Explicitly destroy data to clear up resources
+
+
+#Process Staff for Export here so that futher processing has a clean set of data, specifically addresses are cleared if not wanted
 
 ###################### Import and Process Families ######################
 
@@ -732,13 +842,17 @@ $workingFamilies = @()
 
 if ($includeDeltas -eq $true) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    $importedFamilies = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) (Join-Path -Path $fileLocation -ChildPath $importFileFamiliesDelta) "$PSScriptRoot\Cache\" "DFKEY") | Select-Object -Property DFKEY,E_MAIL_A,MOBILE_A,E_MAIL_B,MOBILE_B,HOMEKEY | Sort-Object -property DFKEY
+    $importedFamilies = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) (Join-Path -Path $fileLocation -ChildPath $importFileFamiliesDelta) "$PSScriptRoot\Cache\" "DFKEY") | Sort-Object -property DFKEY
 }
 else
 {
-    $importedFamilies = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) | Select-Object -Property DFKEY,E_MAIL_A,MOBILE_A,E_MAIL_B,MOBILE_B,HOMEKEY | Sort-Object -property DFKEY
+    $importedFamilies = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) | Sort-Object -property DFKEY
 }
 
+#Handle eduHub headers vs required headers
+$headersFamily = $null
+$headersFamily = (($importedFamilies |Select-Object -First 1).psobject.properties).Name
+$importedFamilies = $importedFamilies | Select-Object ($fieldsFamily + @("E_MAIL_B") + @("MOBILE_B")) #Selecting only required fields and fields for processing only data
 
 #Sort families so that only families where there is an active student are kept and that are due to be exported, then with an active family check to see if primary contact is contact B (A and C are left as A), if so change the details, Contact B is dropped on export. If there use only the first record (usally the oldest student) to calculate this
 
@@ -746,20 +860,18 @@ foreach ($family in $importedFamilies)
 {
     if ($workingStudents.FAMILY -match $family.DFKEY)
     {
-        $workingFamilies += $family
-        
         if ((($workingStudents | Where-Object {$_.FAMILY -eq $family.DFKEY} | Sort-Object -Property SIS_ID | select-object -First 1).CONTACT_A) -eq "B")
         {
             $family.E_MAIL_A = $family.E_MAIL_B
             $family.MOBILE_A = $family.MOBILE_B
             Write-Host "Changing Contacts for $($family.DFKEY)"
         }
-        elseif (((($workingStudents | Where-Object {$_.FAMILY -eq $family.DFKEY} | Sort-Object -Property SIS_ID | select-object -First 1).CONTACT_A) -eq "C") -and -not [string]::IsNullOrWhiteSpace($family.E_MAIL_B) -and $family.E_MAIL_B -ne $family.E_MAIL_A)
+        elseif (((($workingStudents | Where-Object {$_.FAMILY -eq $family.DFKEY} | Sort-Object -Property SIS_ID | select-object -First 1).CONTACT_A) -eq "C") -and -not [string]::IsNullOrWhiteSpace($family.E_MAIL_B) -and ($family.E_MAIL_B -ne $family.E_MAIL_A))
         {
             $family.E_MAIL_A += ";$($family.E_MAIL_B)"
             Write-Host "Adding Secondary Email for $($family.DFKEY)"
         }
-        
+        $workingFamilies += $family
     }
     
 }
@@ -775,17 +887,22 @@ $workingAddresses = @()
 
 if ($includeDeltas -eq $true) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    $importedAddresses = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileAddresses) (Join-Path -Path $fileLocation -ChildPath $importFileAddressesDelta) "$PSScriptRoot\Cache\" "UMKEY")  | Select-Object -Property UMKEY,ADDRESS01,ADDRESS02,ADDRESS03,STATE,POSTCODE,TELEPHONE,MOBILE | Sort-Object -property UMKEY
+    $importedAddresses = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileAddresses) (Join-Path -Path $fileLocation -ChildPath $importFileAddressesDelta) "$PSScriptRoot\Cache\" "UMKEY") | Sort-Object UMKEY
 }
 else
 {
-    $importedAddresses = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileAddresses) | Select-Object -Property UMKEY,ADDRESS01,ADDRESS02,ADDRESS03,STATE,POSTCODE,TELEPHONE,MOBILE | Sort-Object -property UMKEY
+    $importedAddresses = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileAddresses)  | Sort-Object UMKEY
 }
+
+#Handle eduHub headers vs required headers
+$headersAddress = $null
+$headersAddress = (($importedAddresses |Select-Object -First 1).psobject.properties).Name
+$importedAddresses = $importedAddresses | Select-Object $fieldsAddress #Selecting only required fields
 
 #Sort through addresses, only keeping those where there is a family or staff member that are due to be exported associated with the address
 foreach ($address in $importedAddresses)
 {
-    if (($workingFamilies.HOMEKEY -match $address.UMKEY) -or ($workingStaff.HOMEKEY -match $address.UMKEY))
+    if (($workingFamilies.HOMEKEY -match $address.UMKEY) -or ($workingStaff.HOMEKEY -match $address.UMKEY) -or ($workingStaff.MAILKEY -match $address.UMKEY))
     {
         $workingAddresses += $address
     }
@@ -793,3 +910,19 @@ foreach ($address in $importedAddresses)
 }
 
 $importedAddresses = $null #Explicitly destroy data to clear up resources
+
+
+if ($exportFull)
+{
+    $workingStudents = $workingStudents | Select-Object $fieldsStudent | Select-Object $headersStudent #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
+    $workingStaff = $workingStaff | Select-Object $fieldsStaff | Select-Object $headersStaff #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
+    $workingFamilies = $workingFamilies | Select-Object $fieldsFamily | Select-Object $headersFamily #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
+    $workingAddresses = $workingAddresses | Select-Object $fieldsAddress | Select-Object $headersAddress #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
+}
+else
+{
+    $workingStudents = $workingStudents | Select-Object $fieldsStudent #Single Conversion to clear processing data
+    $workingStaff = $workingStaff | Select-Object $fieldsStaff #Single Conversion to clear processing data
+    $workingFamilies = $workingFamilies | Select-Object $fieldsFamily #Single Conversion to clear processing data
+    $workingAddresses = $workingAddresses | Select-Object $fieldsAddress #Single Conversion to clear processing data
+}
