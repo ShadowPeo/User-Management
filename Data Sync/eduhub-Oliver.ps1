@@ -4,8 +4,10 @@ param
     (
         
         #School Details
+        [string]$schoolID = "7893", # Used for export and for import if using CASES File Names
         #$schoolID = [system.environment]::MachineName.Trim().Substring(0,4)
 
+        [string]$schoolEmailDomain = "westernportsc.vic.edu.au", #Only used if processing emails or users from CASES Data
 
         #File Settings
         [boolean]$includeDeltas = $true, #Include eduHub Delta File
