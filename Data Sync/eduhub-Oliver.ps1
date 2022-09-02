@@ -4,16 +4,15 @@ param
     (
         
         #School Details
-        [string]$schoolID = "7893", # Used for export and for import if using CASES File Names
-        #$schoolID = [system.environment]::MachineName.Trim().Substring(0,4)
-
-        [string]$schoolEmailDomain = "westernportsc.vic.edu.au", #Only used if processing emails or users from CASES Data
+        [string]$schoolID = "3432", # Used for export and for import if using CASES File Names
+        [string]$schoolEmailDomain = "mwps.vic.edu.au", #Only used if processing emails or users from CASES Data
 
         #File Settings
         [boolean]$includeDeltas = $true, #Include eduHub Delta File
 
         #File Locations
-        [string]$fileLocation = "$PSSCriptRoot\Import",
+        [string]$fileImportLocation = "$PSSCriptRoot\Import",
+        [string]$fileOutputLocation = "$PSSCriptRoot\Output",
         [string]$importFileStudents = "ST_$($SchoolID).csv",
         [string]$importFileStudentsDelta = "ST_$($SchoolID)_D.csv",
         [string]$importFileStaff = "SF_$($SchoolID).csv",
@@ -27,7 +26,7 @@ param
         #Processing Handling Varialbles
         [float]$handlingStudentExitAfter = 365, #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left students, -1 will always export them
         [float]$handlingStaffExitAfter = 365, #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left staff, -1 will always export them
-        [int]$handlingFileYearLevel = 1, # 1 = Static (use the one from cache, if not exist cache copy and us as literal) 2 = Use Literal, description will e exported exactly as is. 3 = Pad the year numbers (if they exist) in the description field
+        [int]$handlingFileYearLevel = 2, # 1 = Use Literal, description will e exported exactly as is. 2 = Pad the year numbers (if they exist) in the description field
         [boolean]$handlingIncludeFutures = $true, #Include Future Students
         [int]$handlingStudentEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID
         [int]$handlingStaffEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
@@ -35,16 +34,16 @@ param
         [float]$handlingStaffUsername = 5, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP), 6 = Use samAccountName, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 8 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
         [int]$handlingStudentAlias = 1, #1 = SIS_ID, 2= use samAccountName - Fall back to SIS_ID, 3 = Use employeeID from Active Directory - Fall back to SIS_ID
         [int]$handlingStaffAlias = 1, #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
-        [boolean]$handlingValidateLicencing = $false, #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled or where no user exists NOTE: This does not  validating the licencing value, only that the field is not blank
+        [boolean]$handlingValidateLicencing = $false, #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled or where no user exists NOTE: This does not  validating the licencing value, only that the field is not blank - this is meant for use with something like Azure AD where access rights can be assigned based upon dynamic groups based upon AD fields
         [string]$handlingLicencingValue = "licencingLibrary", #The attribute name for the licencing Data NOTE: Ensure the AD schema value exists before running or you will get a silent error
         [boolean]$handlingExportNoUser = $false, #Export user if there is no matching username in AD, if AD lookup is in use
         [boolean]$exportFull = $true, #Include all columns from eduhub in export, blanking those not required
 
         #Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SIS_ID) or in the case of staff members PAYROLL_REC_NO/SIS_EMPNO Matches will also be based upon email matching UPN
-        [boolean]$runAsLoggedIn = $true,
+        [boolean]$runAsLoggedIn = $false,
         [string]$activeDirectoryUser = "CURRIC\da.st00605", #Username to connect to AD as, will prompt for password if credentials do not exist or are incorrect, not used if not running as logged in user
-        [string]$activeDirectoryServer = "10.124.224.137", #DNS Name or IP of AD Server
-        [string]$activeDirectorySearchBase = "OU=Users,OU=Western Port Secondary College,DC=Curric,DC=Western-Port-SC,DC=wan", #DNS Name or IP of AD Server
+        [string]$activeDirectoryServer = "10.128.136.35", #DNS Name or IP of AD Server
+        [string]$activeDirectorySearchBase = "OU=User Accounts,OU=Accounts,OU=3432 - Mount Waverley PS,DC=curric,DC=mount-waverley-ps,DC=wan", #DNS Name or IP of AD Server
 
         #Log File Info
         [string]$sLogPath = "C:\Windows\Temp",
@@ -183,36 +182,11 @@ $fieldsAddress = @(
 )
 
 $fieldsYearLevel = @(
-                    'SFKEY'
-                    'PREF_NAME'
-                    'FIRST_NAME'
-                    'SURNAME'
-                    'BIRTHDATE'
-                    'GENDER'
-                    'FINISH'
-                    'HOMEKEY'           #Used to lookup address details, to get home address details
-                    'E_MAIL'
-                    'MAILKEY'           #Used to lookup address details, to get mailing address details
-                    'PAYROLL_REC_NO'
-                    'SECOND_NAME'
-                    'TITLE'
-                    'MOBILE'
-                    'WORK_PHONE'
-                    'STAFF_STATUS'
-#                    'USERNAME'          #Allow this if you want to use the username field
-                    'ALIAS'
+                    'KCYKEY'
+                    'DESCRIPTION'
 )
 
 #-----------------------------------------------------------[Functions]------------------------------------------------------------
-
-function Get-SchoolDetails 
-{
-    $path = "C:\Windows\Temp\whoami.xml"
-    Invoke-WebRequest -Uri http://broadband.doe.wan/ipsearch/showresult.php -Method POST -Body @{mode='whoami'}| Select-Object -Expand Content | Out-File -Encoding "UTF8" $path
-    $oXMLDocument=New-Object System.XML.XMLDocument  
-    $oXMLDocument.Load($path)
-    return $oXMLDocument.resultset.site
-}
 
 function Join-eduHubDelta
 {
@@ -642,6 +616,8 @@ Function Merge-User
 #Script Execution goes here
 #Log-Finish -LogPath $sLogFile
 
+
+
 ###################### Retrieve AD Users if Required ######################
 
 $ADUsers = $null
@@ -734,6 +710,8 @@ if ($handlingValidateLicencing -or -not $handlingExportNoUser -or (($handlingStu
     }
 
 }
+
+
 ######################Import and Process Students######################
 
 $importedStudents = $null
@@ -743,11 +721,11 @@ $workingStudents = @()
 
 if ($includeDeltas -eq $true) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    $importedStudents = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileStudents) (Join-Path -Path $fileLocation -ChildPath $importFileStudentsDelta) "$PSScriptRoot\Cache\" "STKEY")  | Sort-Object -property STATUS, STKEY
+    $importedStudents = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileImportLocation -ChildPath $importFileStudents) (Join-Path -Path $fileImportLocation -ChildPath $importFileStudentsDelta) "$PSScriptRoot\Cache\" "STKEY")  | Sort-Object -property STATUS, STKEY
 }
 elseif ($includeDeltas -eq $false) #Only Run import if not using modified headers from exporter
 {
-    $importedStudents = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStudents) | Sort-Object -property STATUS, STKEY
+    $importedStudents = Import-CSV (Join-Path -Path $fileImportLocation -ChildPath $importFileStudents) | Sort-Object -property STATUS, STKEY
 }
 else
 {
@@ -793,11 +771,11 @@ $workingStaff = @()
 
 if ($includeDeltas -eq $true) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    $importedStaff = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileStaff)(Join-Path -Path $fileLocation -ChildPath $importFileStaffDelta) "$PSScriptRoot\Cache\" "SFKEY")  | Sort-Object -property STAFF_STATUS, SFKEY
+    $importedStaff = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileImportLocation -ChildPath $importFileStaff)(Join-Path -Path $fileImportLocation -ChildPath $importFileStaffDelta) "$PSScriptRoot\Cache\" "SFKEY")  | Sort-Object -property STAFF_STATUS, SFKEY
 }
 elseif ($includeDeltas -eq $false) #Only Run import if not using modified headers from exporter
 {
-    $importedStaff = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileStaff) | Sort-Object -property STAFF_STATUS, SFKEY
+    $importedStaff = Import-CSV (Join-Path -Path $fileImportLocation -ChildPath $importFileStaff) | Sort-Object -property STAFF_STATUS, SFKEY
 }
 else
 {
@@ -844,11 +822,11 @@ $workingFamilies = @()
 
 if ($includeDeltas -eq $true) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    $importedFamilies = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) (Join-Path -Path $fileLocation -ChildPath $importFileFamiliesDelta) "$PSScriptRoot\Cache\" "DFKEY") | Sort-Object -property DFKEY
+    $importedFamilies = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileImportLocation -ChildPath $importFileFamilies) (Join-Path -Path $fileImportLocation -ChildPath $importFileFamiliesDelta) "$PSScriptRoot\Cache\" "DFKEY") | Sort-Object -property DFKEY
 }
 else
 {
-    $importedFamilies = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileFamilies) | Sort-Object -property DFKEY
+    $importedFamilies = Import-CSV (Join-Path -Path $fileImportLocation -ChildPath $importFileFamilies) | Sort-Object -property DFKEY
 }
 
 #Handle eduHub headers vs required headers
@@ -889,11 +867,11 @@ $workingAddresses = @()
 
 if ($includeDeltas -eq $true) #Only do Delta join if not using files from exporter as exporter joins the files
 {
-    $importedAddresses = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileLocation -ChildPath $importFileAddresses) (Join-Path -Path $fileLocation -ChildPath $importFileAddressesDelta) "$PSScriptRoot\Cache\" "UMKEY") | Sort-Object UMKEY
+    $importedAddresses = Import-CSV (Join-eduHubDelta (Join-Path -Path $fileImportLocation -ChildPath $importFileAddresses) (Join-Path -Path $fileImportLocation -ChildPath $importFileAddressesDelta) "$PSScriptRoot\Cache\" "UMKEY") | Sort-Object UMKEY
 }
 else
 {
-    $importedAddresses = Import-CSV (Join-Path -Path $fileLocation -ChildPath $importFileAddresses)  | Sort-Object UMKEY
+    $importedAddresses = Import-CSV (Join-Path -Path $fileImportLocation -ChildPath $importFileAddresses)  | Sort-Object UMKEY
 }
 
 #Handle eduHub headers vs required headers
@@ -914,12 +892,46 @@ foreach ($address in $importedAddresses)
 $importedAddresses = $null #Explicitly destroy data to clear up resources
 
 
+###################### Import and Process Year Level Descriptions ######################
+
+$importedYearLevels = $null
+$workingYearLevels = @()
+
+#Import Year Levels from CSV(s) based upon settings - No modified headers here as there is no need due to their only being the one table of this type - No Delta's for this file
+
+$importedYearLevels = Import-CSV (Join-Path -Path $fileImportLocation -ChildPath $importFileYearLevels)  | Sort-Object KCYKEY
+
+#Handle eduHub headers vs required headers
+$headersYearLevel = $null
+$headersYearLevel = (($importedYearLevels |Select-Object -First 1).psobject.properties).Name
+$importedYearLevels = $importedYearLevels | Select-Object $fieldsYearLevel #Selecting only required fields
+
+#Sort through YearLevels, only keeping those where there is a family or staff member that are due to be exported associated with the Year Level
+foreach ($YearLevel in $importedYearLevels)
+{
+    if ($YearLevel.DESCRIPTION -ne "DO NOT USE")
+    {
+        if (($YearLevel.DESCRIPTION -match "Year [0-9]" -and $YearLevel.DESCRIPTION -notmatch "Year [0-1][0-9]") -and $handlingFileYearLevel -eq 2)
+        {
+            $YearLevel.DESCRIPTION = "Year 0$(($YearLevel.DESCRIPTION.Trim()).SubString(5,1))"
+        }
+
+        $workingYearLevels += $YearLevel
+    }
+    
+}
+
+$importedYearLevels = $null #Explicitly destroy data to clear up resources
+
+###################### Process Data for Export ######################
+
 if ($exportFull)
 {
     $workingStudents = $workingStudents | Select-Object $fieldsStudent | Select-Object $headersStudent #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
     $workingStaff = $workingStaff | Select-Object $fieldsStaff | Select-Object $headersStaff #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
     $workingFamilies = $workingFamilies | Select-Object $fieldsFamily | Select-Object $headersFamily #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
     $workingAddresses = $workingAddresses | Select-Object $fieldsAddress | Select-Object $headersAddress #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
+    $workingYearLevels = $workingYearLevels | Select-Object $fieldsYearLevel | Select-Object $headersYearLevel #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
 }
 else
 {
@@ -927,4 +939,14 @@ else
     $workingStaff = $workingStaff | Select-Object $fieldsStaff #Single Conversion to clear processing data
     $workingFamilies = $workingFamilies | Select-Object $fieldsFamily #Single Conversion to clear processing data
     $workingAddresses = $workingAddresses | Select-Object $fieldsAddress #Single Conversion to clear processing data
+    $workingYearLevels = $workingYearLevels | Select-Object $fieldsYearLevel #Single Conversion to clear processing data
 }
+
+###################### Export Data ######################
+Get-ChildItem -Path $fileOutputLocation -Include *.* -File -Recurse | ForEach-Object { $_.Delete()}
+
+$workingStudents | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStudents) -encoding ascii
+$workingStaff | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStaff) -encoding ascii
+$workingFamilies | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileFamilies) -encoding ascii
+$workingAddresses | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileAddresses) -encoding ascii
+$workingYearLevels | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileYearLevels) -encoding ascii
