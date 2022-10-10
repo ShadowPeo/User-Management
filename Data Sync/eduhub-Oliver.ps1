@@ -159,7 +159,7 @@ $fieldsStaff = @(
                     'MOBILE'
                     'WORK_PHONE'
                     'STAFF_STATUS'
-#                    'USERNAME'          #Allow this if you want to use the username field
+                    'USERNAME'          #Allow this if you want to use the username field
                     'ALIAS'
 )
 
@@ -613,10 +613,6 @@ Function Merge-User
 #-----------------------------------------------------------[Execution]------------------------------------------------------------
 
 #Log-Start -LogPath $sLogPath -LogName $sLogName -ScriptVersion $sScriptVersion
-#Script Execution goes here
-#Log-Finish -LogPath $sLogFile
-
-
 
 ###################### Retrieve AD Users if Required ######################
 
@@ -950,3 +946,5 @@ $workingStaff | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fi
 $workingFamilies | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileFamilies) -encoding ascii
 $workingAddresses | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileAddresses) -encoding ascii
 $workingYearLevels | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileYearLevels) -encoding ascii
+
+#Log-Finish -LogPath $sLogFile
