@@ -65,7 +65,7 @@ Function LogWrite
     #Write to output no matter the log level
     if ($noOutput -ne $true)
     {
-        if ($foregroundSet -ne "" -and $foregroundSet -ne $null)
+        if ($foregroundSet -ne "" -and $null -ne $foregroundSet)
         {
             Write-Host "$(Get-Date -UFormat '+%Y-%m-%d %H:%M:%S') - $logString" -ForegroundColor $foregroundSet
         }
