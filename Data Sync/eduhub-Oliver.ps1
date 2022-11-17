@@ -48,7 +48,7 @@ param
 
         #Log File Info
         [string]$logPath = "$PSScriptRoot\Logs",
-        [string]$logName = "<script_name>.log",
+        [string]$logName = "$(Get-Date -UFormat '+%Y-%m-%d-%H-%M')-$(if($dryRun -eq $true){"DRYRUN-"})$([io.path]::GetFileNameWithoutExtension($MyInvocation.MyCommand.Name)).log",
         [string]$logLevel = "Information"
     )
 
