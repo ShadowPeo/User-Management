@@ -49,7 +49,12 @@ param
         #Log File Info
         [string]$logPath = "$PSScriptRoot\Logs",
         [string]$logName = "$(Get-Date -UFormat '+%Y-%m-%d-%H-%M')-$(if($dryRun -eq $true){"DRYRUN-"})$([io.path]::GetFileNameWithoutExtension($MyInvocation.MyCommand.Name)).log",
-        [string]$logLevel = "Information"
+        [string]$logLevel = "Information",
+
+        #Program Varialbles
+        [switch]$dryRun = $false,
+        [string]$runMode = "UploadOnly"
+
     )
 
 <#
@@ -109,7 +114,9 @@ param
 $ErrorActionPreference = "SilentlyContinue"
 
 #Dot Source required Function Libraries
-. "$PSScriptRoot\Modules\Logging.ps1"
+"$PSScriptRoot\Modules\Logging.ps1"
+#Import SFTP Details
+Import-Module "$PSSCriptRoot\Config\oliver.users.config.ps1" -Force
 
 #----------------------------------------------------------[Declarations]----------------------------------------------------------
 
@@ -923,7 +930,8 @@ $importedYearLevels = $null #Explicitly destroy data to clear up resources
 
 ###################### Process Data for Export ######################
 
-if ($exportFull -and !$exportCustom)
+#Do a double conversion for exporting for or exporting custom (to ensure the correct columns exist even if they are blank)
+if ($exportFull -or $exportCustom)
 {
     $workingStudents = $workingStudents | Select-Object $fieldsStudent | Select-Object $headersStudent #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
     $workingStaff = $workingStaff | Select-Object $fieldsStaff | Select-Object $headersStaff #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
@@ -931,7 +939,8 @@ if ($exportFull -and !$exportCustom)
     $workingAddresses = $workingAddresses | Select-Object $fieldsAddress | Select-Object $headersAddress #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
     $workingYearLevels = $workingYearLevels | Select-Object $fieldsYearLevel | Select-Object $headersYearLevel #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
 }
-elseif (!$exportfull -and !$exportCustom)
+
+if (!$exportfull -and !$exportCustom)
 {
     $workingStudents = $workingStudents | Select-Object $fieldsStudent #Single Conversion to clear processing data
     $workingStaff = $workingStaff | Select-Object $fieldsStaff #Single Conversion to clear processing data
@@ -940,8 +949,9 @@ elseif (!$exportfull -and !$exportCustom)
     $workingYearLevels = $workingYearLevels | Select-Object $fieldsYearLevel #Single Conversion to clear processing data
 }
 
-elseif($exportCustom)
+if($exportCustom)
 {
+    Write-Host "Generating Custom Exports"
     #Iterate and Process Students
     foreach ($student in $workingStudents)
     {
@@ -1039,11 +1049,13 @@ Get-ChildItem -Path $fileOutputLocation -Include *.* -File -Recurse | ForEach-Ob
 
 if(!(Test-Path($fileOutputLocation)))
 {
+    Write-Host "Creating Output Folder"
     New-Item -Path $fileOutputLocation -ItemType Directory | Out-Null
 }
 
 if (!$exportCustom)
 {
+    Write-Host "Exporting Generic eduHub Exports"
     $workingStudents | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStudents) -encoding ascii
     $workingStaff | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStaff) -encoding ascii
     $workingFamilies | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileFamilies) -encoding ascii
@@ -1052,8 +1064,52 @@ if (!$exportCustom)
 }
 else 
 {
-    $workingStudents | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStudents) -encoding ascii
-    $workingStaff | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStaff) -encoding ascii
+    Write-Host "Exporting Custom Exports"
+    $workingStudents | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath "Custom_Students.csv") -encoding ascii
+    $workingStaff | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath "Custom_Staff.csv") -encoding ascii
+}
+
+
+#Upload Data
+
+if (!$dryRun -and $runMode -ne "Generate")
+{
+    #Test ICMP connection
+    if ((Test-Connection -TargetName $sftpAddress))
+    {
+        Write-Host "Successfully to SFTP server at address $sftpAddress"
+    }
+    else 
+    {
+        Write-Host "Cannot connect to Unimus server at address $sftpAddress exiting"
+        exit
+    }
+
+
+    #Check Putty SCP exists, if not attempt to download it
+    if (!(Test-Path "$PSScriptRoot/pscp.exe" -PathType Leaf))
+    {
+        Write-Host "PSCP not found, downloading"
+        try
+        {
+            Invoke-WebRequest -Uri "https://the.earth.li/~sgtatham/putty/latest/w64/pscp.exe" -OutFile "$PSScriptRoot/pscp.exe" | Out-Null
+        }
+        catch
+        {
+            $_.Exception.Response.StatusCode.Value__
+        }
+    }
+    else 
+    {
+        Write-Host "PSCP Found, Continuing"
+    }
+
+    $fileList = Get-ChildItem -Path $fileOutputLocation -Filter "*.csv"
+    foreach ($file in $fileList)
+    {
+        #& "$PSScriptRoot\pscp.exe"  -q -batch -pw "$($device.Password)" -sftp "$($device.Username)@$($device.Address):$($device.Path)" "`"$PSScriptRoot\Temp\$fileName`""
+        & "$PSScriptRoot\pscp.exe" -q -batch -pw $sftpPassword -sftp -l $sftpUser $($file.FullName) "$sftpAddress`:$sftpDirectory/$($file.Name)"
+    }
 }
 
 #Log-Finish -LogPath $sLogFile
