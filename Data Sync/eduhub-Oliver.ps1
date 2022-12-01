@@ -33,12 +33,13 @@ param
         [float]$handlingStudentUsername = 5, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP), 6 = Use samAccountName, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID
         [float]$handlingStaffUsername = 5, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP), 6 = Use samAccountName, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 8 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
         [int]$handlingStudentAlias = 1, #1 = SIS_ID, 2= use samAccountName - Fall back to SIS_ID, 3 = Use employeeID from Active Directory - Fall back to SIS_ID
-        [int]$handlingStaffAlias = 1, #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
+        [int]$handlingStaffAlias = 4, #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
         [boolean]$handlingValidateLicencing = $false, #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled or where no user exists NOTE: This does not  validating the licencing value, only that the field is not blank - this is meant for use with something like Azure AD where access rights can be assigned based upon dynamic groups based upon AD fields
         [string]$handlingLicencingValue = "licencingLibrary", #The attribute name for the licencing Data NOTE: Ensure the AD schema value exists before running or you will get a silent error
         [boolean]$handlingExportNoUser = $false, #Export user if there is no matching username in AD, if AD lookup is in use
         [boolean]$exportFull = $false, #Include all columns from eduhub in export, blanking those not required
-        [boolean]$exportCustom = $true, #Include all columns from eduhub in export, blanking those not required
+        [boolean]$exportCustom = $true, #Export Custom information as needed only
+        [string]$exportFormat = "utf8", #Formats supported for output ascii, unicode, utf8, utf32
 
         #Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SIS_ID) or in the case of staff members PAYROLL_REC_NO/SIS_EMPNO Matches will also be based upon email matching UPN
         [boolean]$runAsLoggedIn = $false,
@@ -52,8 +53,8 @@ param
         [string]$logLevel = "Information",
 
         #Program Varialbles
-        [switch]$dryRun = $false,
-        [string]$runMode = "UploadOnly"
+        [bool]$dryRun = $false,
+        [string]$runMode = $null #"UploadOnly"
 
     )
 
@@ -931,7 +932,7 @@ $importedYearLevels = $null #Explicitly destroy data to clear up resources
 ###################### Process Data for Export ######################
 
 #Do a double conversion for exporting for or exporting custom (to ensure the correct columns exist even if they are blank)
-if ($exportFull -or $exportCustom)
+if ($exportFull -and !$exportCustom)
 {
     $workingStudents = $workingStudents | Select-Object $fieldsStudent | Select-Object $headersStudent #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
     $workingStaff = $workingStaff | Select-Object $fieldsStaff | Select-Object $headersStaff #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
@@ -989,8 +990,7 @@ if($exportCustom)
 
         $student | Add-Member -Type NoteProperty -Name "ADDRESS01" -Value ($studentAddress.ADDRESS01)
         $student | Add-Member -Type NoteProperty -Name "ADDRESS02" -Value ($studentAddress.ADDRESS02)
-        $student | Add-Member -Type NoteProperty -Name "ADDRESS03" -Value ($studentAddress.ADDRESS03)
-        $student | Add-Member -Type NoteProperty -Name "STATE" -Value ($studentAddress.STATE)
+        $student | Add-Member -Type NoteProperty -Name "ADDRESS03" -Value "$($studentAddress.ADDRESS03), $($studentAddress.STATE)"
         $student | Add-Member -Type NoteProperty -Name "POSTCODE" -Value ($studentAddress.POSTCODE)
 
         if($StudentAddress.MOBILE -ne $student.PARENT_MOBILE_A -and $StudentAddress.MOBILE -ne $student.PARENT_MOBILE_B)
@@ -1024,8 +1024,7 @@ if($exportCustom)
         
         $staffMember | Add-Member -Type NoteProperty -Name "ADDRESS01" -Value ($staffMemberAddress.ADDRESS01)
         $staffMember | Add-Member -Type NoteProperty -Name "ADDRESS02" -Value ($staffMemberAddress.ADDRESS02)
-        $staffMember | Add-Member -Type NoteProperty -Name "ADDRESS03" -Value ($staffMemberAddress.ADDRESS03)
-        $staffMember | Add-Member -Type NoteProperty -Name "STATE" -Value ($staffMemberAddress.STATE)
+        $staffMember | Add-Member -Type NoteProperty -Name "ADDRESS03" -Value "$($staffMemberAddress.ADDRESS03), $($staffMemberAddress.STATE)"
         $staffMember | Add-Member -Type NoteProperty -Name "POSTCODE" -Value ($staffMemberAddress.POSTCODE)
 
         if(!([string]::IsNullOrWhiteSpace($staffMemberAddress.MOBILE)) -and $staffMemberAddress.MOBILE -ne $staffMember.MOBILE)
@@ -1056,17 +1055,17 @@ if(!(Test-Path($fileOutputLocation)))
 if (!$exportCustom)
 {
     Write-Host "Exporting Generic eduHub Exports"
-    $workingStudents | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStudents) -encoding ascii
-    $workingStaff | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStaff) -encoding ascii
-    $workingFamilies | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileFamilies) -encoding ascii
-    $workingAddresses | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileAddresses) -encoding ascii
-    $workingYearLevels | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileYearLevels) -encoding ascii
+    $workingStudents | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStudents) -encoding $exportFormat
+    $workingStaff | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStaff) -encoding $exportFormat
+    $workingFamilies | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileFamilies) -encoding $exportFormat
+    $workingAddresses | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileAddresses) -encoding $exportFormat
+    $workingYearLevels | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileYearLevels) -encoding $exportFormat
 }
 else 
 {
     Write-Host "Exporting Custom Exports"
-    $workingStudents | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath "Custom_Students.csv") -encoding ascii
-    $workingStaff | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath "Custom_Staff.csv") -encoding ascii
+    $workingStudents | Select-Object -Property SIS_ID,SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,GENDER,FINISH,SCHOOL_YEAR,HOME_GROUP,E_MAIL,ALIAS,USERNAME,ADDRESS01,ADDRESS02,ADDRESS03,POSTCODE,TELEPHONE,MOBILE,PARENT_E_MAIL_A,PARENT_E_MAIL_B,PARENT_MOBILE_A,PARENT_MOBILE_B | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath "Custom_Students.csv") -encoding $exportFormat
+    $workingStaff | Select-Object -Property SIS_ID,SIS_EMPNO,SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,TITLE,BIRTHDATE,FINISH,E_MAIL,ALIAS,USERNAME,ADDRESS01,ADDRESS02,ADDRESS03,POSTCODE,TELEPHONE,MOBILE | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath "Custom_Staff.csv") -encoding $exportFormat
 }
 
 
