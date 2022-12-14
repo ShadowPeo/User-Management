@@ -28,16 +28,18 @@ param
         [float]$handlingStaffExitAfter = 365, #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left staff, -1 will always export them
         [int]$handlingFileYearLevel = 2, # 1 = Use Literal, description will e exported exactly as is. 2 = Pad the year numbers (if they exist) in the description field
         [boolean]$handlingIncludeFutures = $true, #Include Future Students
-        [int]$handlingStudentEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID
-        [int]$handlingStaffEmail = 1, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
+        [int]$handlingStudentEmail = 4, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID
+        [int]$handlingStaffEmail = 4, #1 = Use eduHub Email, 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP),  6 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
         [float]$handlingStudentUsername = 5, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP), 6 = Use samAccountName, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID
         [float]$handlingStaffUsername = 5, #0 = Blank, 1 = use eduHub Data (SIS_ID), 2 = Calculate from eduHub Data (SIS_ID)@domain, 3 = pull from AD UPN, 4 = Pull from AD Mail, 5 = Pull from AD ProxyAddresses looking for primary (Capital SMTP), 6 = Use samAccountName, 7 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from AD, fall back to SIS_ID, 8 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data, fall back to SIS_ID
         [int]$handlingStudentAlias = 1, #1 = SIS_ID, 2= use samAccountName - Fall back to SIS_ID, 3 = Use employeeID from Active Directory - Fall back to SIS_ID
-        [int]$handlingStaffAlias = 1, #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
+        [int]$handlingStaffAlias = 4, #1 = SIS_ID, 2= use samAccountName, 3 = Use employeeID from Active Directory - Fall back to SIS_ID, 4 = Use employeeID (PAYROLL_REC_NO/SIS_EMPNO/EmployeeNumber) from eduHub Data - Fall back to SIS_ID
         [boolean]$handlingValidateLicencing = $false, #Validate the licencing for Oliver, this will drop accounts where it is explictly disabled or where no user exists NOTE: This does not  validating the licencing value, only that the field is not blank - this is meant for use with something like Azure AD where access rights can be assigned based upon dynamic groups based upon AD fields
         [string]$handlingLicencingValue = "licencingLibrary", #The attribute name for the licencing Data NOTE: Ensure the AD schema value exists before running or you will get a silent error
         [boolean]$handlingExportNoUser = $false, #Export user if there is no matching username in AD, if AD lookup is in use
-        [boolean]$exportFull = $true, #Include all columns from eduhub in export, blanking those not required
+        [boolean]$exportFull = $false, #Include all columns from eduhub in export, blanking those not required
+        [boolean]$exportCustom = $true, #Export Custom information as needed only
+        [string]$exportFormat = "utf8", #Formats supported for output ascii, unicode, utf8, utf32
 
         #Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SIS_ID) or in the case of staff members PAYROLL_REC_NO/SIS_EMPNO Matches will also be based upon email matching UPN
         [boolean]$runAsLoggedIn = $false,
@@ -46,11 +48,16 @@ param
         [string]$activeDirectorySearchBase = "OU=User Accounts,OU=Accounts,OU=3432 - Mount Waverley PS,DC=curric,DC=mount-waverley-ps,DC=wan", #DNS Name or IP of AD Server
 
         #Log File Info
-        [string]$sLogPath = "C:\Windows\Temp",
-        [string]$sLogName = "<script_name>.log"
+        [string]$logPath = "$PSScriptRoot\Logs",
+        [string]$logName = "$(Get-Date -UFormat '+%Y-%m-%d-%H-%M')-$(if($dryRun -eq $true){"DRYRUN-"})$([io.path]::GetFileNameWithoutExtension($MyInvocation.MyCommand.Name)).log",
+        [string]$logLevel = "Information",
+
+        #Program Varialbles
+        [bool]$dryRun = $false,
+        [string]$runMode = $null #"UploadOnly"
+
     )
 
-#requires -version 2
 <#
 .SYNOPSIS
   Takes eduhub data drops the un-needed data for privacy and exports the files for upload to the Oliver servers.
@@ -108,11 +115,13 @@ param
 $ErrorActionPreference = "SilentlyContinue"
 
 #Dot Source required Function Libraries
-. "$PSScriptRoot\Modules\Logging.ps1"
+"$PSScriptRoot\Modules\Logging.ps1"
+#Import SFTP Details
+Import-Module "$PSSCriptRoot\Config\oliver.users.config.ps1" -Force
 
 #----------------------------------------------------------[Declarations]----------------------------------------------------------
 
-$sLogFile = Join-Path -Path $sLogPath -ChildPath $sLogName
+#$sLogFile = Join-Path -Path $sLogPath -ChildPath $sLogName
 
 #Script Variables - Declared to stop it being generated multiple times per run
 
@@ -291,6 +300,8 @@ Function Merge-User
                 return $null
             }
         } 
+
+        Write-Host "Processing $($workingUser.SIS_ID)"
         
         if ($adCheck)
         {
@@ -355,8 +366,6 @@ Function Merge-User
                  ) 
              }
             
-            Write-Host "$($AD_User.samAccountName) | $($workingUser.SIS_ID)"
-
             if ($null -eq $AD_User)
             {
                 Write-Host "NULL AD: $($AD_User.samAccountName) | $($workingUser.SIS_ID)"
@@ -729,6 +738,7 @@ else
 }
 
 
+
 #Handle eduHub headers vs required headers
 $headersStudent = $null
 $headersStudent = (($importedStudents | Select-Object -First 1).psobject.properties).Name
@@ -921,7 +931,8 @@ $importedYearLevels = $null #Explicitly destroy data to clear up resources
 
 ###################### Process Data for Export ######################
 
-if ($exportFull)
+#Do a double conversion for exporting for or exporting custom (to ensure the correct columns exist even if they are blank)
+if ($exportFull -and !$exportCustom)
 {
     $workingStudents = $workingStudents | Select-Object $fieldsStudent | Select-Object $headersStudent #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
     $workingStaff = $workingStaff | Select-Object $fieldsStaff | Select-Object $headersStaff #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
@@ -929,7 +940,8 @@ if ($exportFull)
     $workingAddresses = $workingAddresses | Select-Object $fieldsAddress | Select-Object $headersAddress #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
     $workingYearLevels = $workingYearLevels | Select-Object $fieldsYearLevel | Select-Object $headersYearLevel #Double Conversion to clear processing data and then re-instate eduhub fields in the correct order
 }
-else
+
+if (!$exportfull -and !$exportCustom)
 {
     $workingStudents = $workingStudents | Select-Object $fieldsStudent #Single Conversion to clear processing data
     $workingStaff = $workingStaff | Select-Object $fieldsStaff #Single Conversion to clear processing data
@@ -938,13 +950,165 @@ else
     $workingYearLevels = $workingYearLevels | Select-Object $fieldsYearLevel #Single Conversion to clear processing data
 }
 
+if($exportCustom)
+{
+    Write-Host "Generating Custom Exports"
+    #Iterate and Process Students
+    foreach ($student in $workingStudents)
+    {
+        $studentFamily = $null
+        $studentAddress = $null
+        $studentFamily = $workingFamilies | WHERE-OBJECT DFKEY -eq $student.FAMILY
+        $studentAddress = $workingAddresses | WHERE-OBJECT UMKEY -eq $studentFamily.HOMEKEY
+        
+
+        if($studentFamily.E_MAIL_A -notmatch ";" -and ![string]::IsNullOrWhiteSpace($studentFamily.E_MAIL_A))
+        {
+            $student | Add-Member -Type NoteProperty -Name "PARENT_E_MAIL_A" -Value ($studentFamily.E_MAIL_A)
+            $student | Add-Member -Type NoteProperty -Name "PARENT_E_MAIL_B" -Value ""
+        }
+        elseif ($studentFamily.E_MAIL_A -match ";")
+        {
+            $split = $null
+            $split = ($studentFamily.E_MAIL_A) -split ";"
+            $student | Add-Member -Type NoteProperty -Name "PARENT_E_MAIL_A" -Value $split[0] 
+            $student | Add-Member -Type NoteProperty -Name "PARENT_E_MAIL_B" -Value $split[1] 
+        }
+
+        if($studentFamily.MOBILE_A -notmatch ";" -and ![string]::IsNullOrWhiteSpace($studentFamily.MOBILE_A))
+        {
+            $student | Add-Member -Type NoteProperty -Name "PARENT_MOBILE_A" -Value ($studentFamily.MOBILE_A)
+            $student | Add-Member -Type NoteProperty -Name "PARENT_MOBILE_B" -Value ""
+        }
+        elseif ($studentFamily.MOBILE_A -match ";")
+        {
+            $split = $null
+            $split = ($studentFamily.MOBILE_A) -split ";"
+            $student | Add-Member -Type NoteProperty -Name "PARENT_MOBILE_A" -Value $split[0] 
+            $student | Add-Member -Type NoteProperty -Name "PARENT_MOBILE_B" -Value $split[1] 
+        }
+
+        $student | Add-Member -Type NoteProperty -Name "ADDRESS01" -Value ($studentAddress.ADDRESS01)
+        $student | Add-Member -Type NoteProperty -Name "ADDRESS02" -Value ($studentAddress.ADDRESS02)
+        $student | Add-Member -Type NoteProperty -Name "ADDRESS03" -Value "$($studentAddress.ADDRESS03), $($studentAddress.STATE)"
+        $student | Add-Member -Type NoteProperty -Name "POSTCODE" -Value ($studentAddress.POSTCODE)
+
+        if($StudentAddress.MOBILE -ne $student.PARENT_MOBILE_A -and $StudentAddress.MOBILE -ne $student.PARENT_MOBILE_B)
+        {
+            if([string]::IsNullOrWhiteSpace($student.PARENT_MOBILE_A))
+            {
+                $student | Add-Member -Type NoteProperty -Name "PARENT_MOBILE_A" -Value ($studentAddress.MOBILE)
+            }
+            elseif([string]::IsNullOrWhiteSpace($student.PARENT_MOBILE_A))
+            {
+                $student | Add-Member -Type NoteProperty -Name "PARENT_MOBILE_B" -Value ($studentAddress.MOBILE)
+            }
+        }
+
+        if($StudentAddress.TELEPHONE -ne $student.PARENT_MOBILE_A -and $StudentAddress.TELEPHONE -ne $student.PARENT_MOBILE_B)
+        {
+                $student | Add-Member -Type NoteProperty -Name "TELEPHONE" -Value ($studentAddress.TELEPHONE)
+        }
+        else 
+        {
+            $student | Add-Member -Type NoteProperty -Name "TELEPHONE" -Value ""
+        }
+
+    }
+
+    #Iterate and process Staff
+    foreach ($staffMember in $workingStaff)
+    {
+        $staffMemberAddress = $null
+        $staffMemberAddress = $workingAddresses | WHERE-OBJECT UMKEY -eq $staffMember.MAILKEY
+        
+        $staffMember | Add-Member -Type NoteProperty -Name "ADDRESS01" -Value ($staffMemberAddress.ADDRESS01)
+        $staffMember | Add-Member -Type NoteProperty -Name "ADDRESS02" -Value ($staffMemberAddress.ADDRESS02)
+        $staffMember | Add-Member -Type NoteProperty -Name "ADDRESS03" -Value "$($staffMemberAddress.ADDRESS03), $($staffMemberAddress.STATE)"
+        $staffMember | Add-Member -Type NoteProperty -Name "POSTCODE" -Value ($staffMemberAddress.POSTCODE)
+
+        if(!([string]::IsNullOrWhiteSpace($staffMemberAddress.MOBILE)) -and $staffMemberAddress.MOBILE -ne $staffMember.MOBILE)
+        {
+                $staffMember.MOBILE = $staffMemberAddress.MOBILE
+        }
+
+        if($staffMemberAddress.TELEPHONE -ne $staffMember.MOBILE)
+        {
+                $staffMember | Add-Member -Type NoteProperty -Name "TELEPHONE" -Value ($staffMemberAddress.TELEPHONE)
+        }
+        else 
+        {
+            $staffMember | Add-Member -Type NoteProperty -Name "TELEPHONE" -Value ""
+        }
+    }
+}
+
 ###################### Export Data ######################
 Get-ChildItem -Path $fileOutputLocation -Include *.* -File -Recurse | ForEach-Object { $_.Delete()}
 
-$workingStudents | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStudents) -encoding ascii
-$workingStaff | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStaff) -encoding ascii
-$workingFamilies | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileFamilies) -encoding ascii
-$workingAddresses | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileAddresses) -encoding ascii
-$workingYearLevels | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileYearLevels) -encoding ascii
+if(!(Test-Path($fileOutputLocation)))
+{
+    Write-Host "Creating Output Folder"
+    New-Item -Path $fileOutputLocation -ItemType Directory | Out-Null
+}
+
+if (!$exportCustom)
+{
+    Write-Host "Exporting Generic eduHub Exports"
+    $workingStudents | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStudents) -encoding $exportFormat
+    $workingStaff | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileStaff) -encoding $exportFormat
+    $workingFamilies | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileFamilies) -encoding $exportFormat
+    $workingAddresses | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileAddresses) -encoding $exportFormat
+    $workingYearLevels | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath $importFileYearLevels) -encoding $exportFormat
+}
+else 
+{
+    Write-Host "Exporting Custom Exports"
+    $workingStudents | Select-Object -Property SIS_ID,SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,BIRTHDATE,GENDER,FINISH,SCHOOL_YEAR,HOME_GROUP,E_MAIL,ALIAS,USERNAME,ADDRESS01,ADDRESS02,ADDRESS03,POSTCODE,TELEPHONE,MOBILE,PARENT_E_MAIL_A,PARENT_E_MAIL_B,PARENT_MOBILE_A,PARENT_MOBILE_B | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath "Custom_Students.csv") -encoding $exportFormat
+    $workingStaff | Select-Object -Property SIS_ID,SIS_EMPNO,SURNAME,FIRST_NAME,SECOND_NAME,PREF_NAME,TITLE,BIRTHDATE,FINISH,E_MAIL,ALIAS,USERNAME,ADDRESS01,ADDRESS02,ADDRESS03,POSTCODE,TELEPHONE,MOBILE | ConvertTo-Csv -NoTypeInformation | Out-File (Join-Path -Path $fileOutputLocation -ChildPath "Custom_Staff.csv") -encoding $exportFormat
+}
+
+
+#Upload Data
+
+if (!$dryRun -and $runMode -ne "Generate")
+{
+    #Test ICMP connection
+    if ((Test-Connection -TargetName $sftpAddress))
+    {
+        Write-Host "Successfully to SFTP server at address $sftpAddress"
+    }
+    else 
+    {
+        Write-Host "Cannot connect to Unimus server at address $sftpAddress exiting"
+        exit
+    }
+
+
+    #Check Putty SCP exists, if not attempt to download it
+    if (!(Test-Path "$PSScriptRoot/pscp.exe" -PathType Leaf))
+    {
+        Write-Host "PSCP not found, downloading"
+        try
+        {
+            Invoke-WebRequest -Uri "https://the.earth.li/~sgtatham/putty/latest/w64/pscp.exe" -OutFile "$PSScriptRoot/pscp.exe" | Out-Null
+        }
+        catch
+        {
+            $_.Exception.Response.StatusCode.Value__
+        }
+    }
+    else 
+    {
+        Write-Host "PSCP Found, Continuing"
+    }
+
+    $fileList = Get-ChildItem -Path $fileOutputLocation -Filter "*.csv"
+    foreach ($file in $fileList)
+    {
+        #& "$PSScriptRoot\pscp.exe"  -q -batch -pw "$($device.Password)" -sftp "$($device.Username)@$($device.Address):$($device.Path)" "`"$PSScriptRoot\Temp\$fileName`""
+        & "$PSScriptRoot\pscp.exe" -q -batch -pw $sftpPassword -sftp -l $sftpUser $($file.FullName) "$sftpAddress`:$sftpDirectory/$($file.Name)"
+    }
+}
 
 #Log-Finish -LogPath $sLogFile
