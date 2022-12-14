@@ -12,11 +12,11 @@ function Get-Password
     {
         if ( $pwType -ieq "Simple")
         {
-            return ($PWD = (Invoke-WebRequest -UseBasicParsing "http://www.dinopass.com/password").content)
+            return Invoke-RestMethod -UseBasicParsing "http://www.dinopass.com/password"
         }
         else
         {
-            return ($PWD = (Invoke-WebRequest -UseBasicParsing "http://www.dinopass.com/password/strong").content)
+            return Invoke-RestMethod  -UseBasicParsing "http://www.dinopass.com/password/strong"
         }
     }
     catch
