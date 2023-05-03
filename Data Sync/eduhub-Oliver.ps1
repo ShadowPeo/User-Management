@@ -4,8 +4,8 @@ param
     (
         
         #School Details
-        [string]$schoolID = "3432", # Used for export and for import if using CASES File Names
-        [string]$schoolEmailDomain = "mwps.vic.edu.au", #Only used if processing emails or users from CASES Data
+        [string]$schoolID = "<<SCHOOLNUMBER>>", # Used for export and for import if using CASES File Names
+        [string]$schoolEmailDomain = "<<SCHOOLDOMAIN>>", #Only used if processing emails or users from CASES Data
 
         #File Settings
         [boolean]$includeDeltas = $true, #Include eduHub Delta File
@@ -43,9 +43,9 @@ param
 
         #Active Directory Settings (Only required if using AD lookups - Active Directory lookups rely on the samAccountName being either the Key (SIS_ID) or in the case of staff members PAYROLL_REC_NO/SIS_EMPNO Matches will also be based upon email matching UPN
         [boolean]$runAsLoggedIn = $false,
-        [string]$activeDirectoryUser = "CURRIC\da.st00605", #Username to connect to AD as, will prompt for password if credentials do not exist or are incorrect, not used if not running as logged in user
-        [string]$activeDirectoryServer = "10.128.136.35", #DNS Name or IP of AD Server
-        [string]$activeDirectorySearchBase = "OU=User Accounts,OU=Accounts,OU=3432 - Mount Waverley PS,DC=curric,DC=mount-waverley-ps,DC=wan", #DNS Name or IP of AD Server
+        [string]$activeDirectoryUser = "<<SCHOOL_AD_USER>>", #Username to connect to AD as, will prompt for password if credentials do not exist or are incorrect, not used if not running as logged in user
+        [string]$activeDirectoryServer = "<<SCHOOL_AD_SERVER>>", #DNS Name or IP of AD Server
+        [string]$activeDirectorySearchBase = "<<SCHOOL_SEARCH_BASE_OU>>", #DNS Name or IP of AD Server
 
         #Log File Info
         [string]$logPath = "$PSScriptRoot\Logs",
