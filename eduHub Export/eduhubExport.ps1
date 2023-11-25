@@ -164,7 +164,7 @@ $fieldsKGC = @(
                     'KGCKEY'
                     'DESCRIPTION'
                     'CAMPUS'
-                    'TEACHER_A'
+                    'TEACHER'
                     'TEACHER_B'
                     'ACTIVE'
                     'ROOM'
