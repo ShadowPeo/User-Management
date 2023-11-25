@@ -2,7 +2,7 @@ param
     (
         
         #School Details
-        [string]$schoolNumber = "<<SCHOOL_NUMBER>>", # Used for export and for import if using CASES File Names, TODO: Add code to pull from server name/bbportal
+        [string]$schoolNumber = "3432", # Used for export and for import if using CASES File Names, TODO: Add code to pull from server name/bbportal
 
         #File Locations
         [string]$fileImportLocation = "$PSScriptRoot\..\eduHub Export\Output",
@@ -77,7 +77,10 @@ $fieldsST = @(
                     'SCHOOL_YEAR'
                     'HOME_GROUP'
                     'NEXT_HG'
+                    'GENDER'
                     'E_MAIL'
+                    'BIRTHDATE'
+                    'VSN'
 )
 
 $fieldsSF = @(
@@ -169,7 +172,7 @@ $outputYear = (Get-Date -Format "yyyy")
 if (Test-Path -Path ("$fileImportLocation\KGC_$schoolNumber.csv"))
 {
     Write-Log "KGC File Exists, Importing"
-    $classes = Import-CSV -Path "$fileImportLocation\KGC_$schoolNumber.csv" -Delimiter "," | Where-Object {$_.ACTIVE -eq "Y" -and ([int](($_.KGCKEY).SubString(0,2)) -ge $gradeLowest -and [int](($_.KGCKEY).SubString(0,2)) -le $gradeHighest)} | Select-Object $fieldsKGC | Sort-Object KGCKEY
+    $classes = Import-CSV -Path "$fileImportLocation\KGC_$schoolNumber.csv" -Delimiter "," | Where-Object {$_.ACTIVE -eq "Y"} | Select-Object $fieldsKGC | Sort-Object KGCKEY
     foreach($class in $classes)
     {
         $class.DESCRIPTION = "$outputYear - Class $($class.KGCKEY)"
@@ -183,11 +186,10 @@ if (Test-Path -Path ("$fileImportLocation\KGC_$schoolNumber.csv"))
             $tempStaff = $null
             $tempStaff = $staff | Where-Object SFKEY -eq $class.TEACHER
             $tempObject = [PSCustomObject]@{
-                "Class Name" = "$outputYear - Class $($class.KGCKEY)"
-                "First Name" = $tempStaff.FIRST_NAME
-                "Last Name" = $tempStaff.SURNAME
-                "Email" = $tempStaff.E_MAIL
-                "Head Teacher" = "N"
+                "Staff First Name" = $tempStaff.FIRST_NAME
+                "Staff Last Name" = $tempStaff.SURNAME
+                "Staff Email" = $tempStaff.E_MAIL
+                "Classroom" = "$outputYear - Class $($class.KGCKEY)"
             }
             $tempStaff = $null
         }
@@ -198,11 +200,10 @@ if (Test-Path -Path ("$fileImportLocation\KGC_$schoolNumber.csv"))
             $tempStaff = $null
             $tempStaff = $staff | Where-Object SFKEY -eq $class.TEACHER
             $tempObject = [PSCustomObject]@{
-                "Class Name" = "$outputYear - Class $($class.KGCKEY)"
-                "First Name" = $tempStaff.FIRST_NAME
-                "Last Name" = $tempStaff.SURNAME
-                "Email" = $tempStaff.E_MAIL
-                "Head Teacher" = "N"
+                "Staff First Name" = $tempStaff.FIRST_NAME
+                "Staff Last Name" = $tempStaff.SURNAME
+                "Staff Email" = $tempStaff.E_MAIL
+                "Classroom" = "$outputYear - Class $($class.KGCKEY)"
             }
             $tempStaff = $null
         }
@@ -218,6 +219,17 @@ else
     Exit
 }
 
+foreach($staffMember in ($staff | Where-Object { $_.STAFF_STATUS -ne "LEFT" -and $_.STAFF_STATUS -ne "INAC" -and ($staffOutput."Staff Email" -notcontains $_.E_MAIL)}))
+{
+    $tempObject = [PSCustomObject]@{
+        "Staff First Name" = $staffMember.FIRST_NAME
+        "Staff Last Name" = $staffMember.SURNAME
+        "Staff Email" = $staffMember.E_MAIL
+        "Classroom" = ""
+    }
+    $staffOutput += $tempObject
+}
+
 
 #Blank Current Teacher Variable
 $currentTeacher = $null
@@ -228,7 +240,7 @@ $studentOutput = @()
 if (Test-Path -Path ("$fileImportLocation\ST_$schoolNumber.csv"))
 {
     Write-Log "ST File Exists, Importing"
-    $students = Import-CSV -Path "$fileImportLocation\ST_$schoolNumber.csv" -Delimiter "," | Where-Object{$_.STATUS -ne "LEFT" -and $_.STATUS -ne "INAC"  -and ([int]$_.SCHOOL_YEAR -ge $gradeLowest -and [int]$_.SCHOOL_YEAR -le $gradeHighest)} | Select-Object $fieldsST | Sort-Object STKEY
+    $students = Import-CSV -Path "$fileImportLocation\ST_$schoolNumber.csv" -Delimiter "," | Where-Object{(-not [string]::IsNullOrWhiteSpace($_.VSN) -and $_.VSN -ne "UNKNOWN") -and $_.STATUS -ne "LEFT" -and $_.STATUS -ne "INAC"  -and ([int]$_.SCHOOL_YEAR -ge $gradeLowest -and [int]$_.SCHOOL_YEAR -le $gradeHighest)} | Select-Object $fieldsST | Sort-Object STKEY
 
     foreach ($student in ($students | Sort-Object HOME_GROUP,SCHOOL_YEAR,STKEY))
     {
@@ -246,15 +258,40 @@ if (Test-Path -Path ("$fileImportLocation\ST_$schoolNumber.csv"))
             $student.E_MAIL = $studentAD.mail
         }
 
+        if ([string]::IsNullOrWhiteSpace($currentTeacher.SFKEY) -or $currentTeacher.SFKEY -ne ($classes | Where-Object KGCKEY -eq $student.HOME_GROUP).TEACHER)
+        {
+            $currentTeacher = $null
+            $currentTeacher = $staff | Where-Object SFKEY -eq ($classes | Where-Object KGCKEY -eq $student.HOME_GROUP).TEACHER
+        }
+
         #Create Object with the required details to output to the system
         $tempObject = $null
         $tempObject = [PSCustomObject]@{
-            'Class Name' = "$outputYear - Class $($student.HOME_GROUP)"
-            'First Name' = $($student.FIRST_NAME)
-            'Last Name' = $($student.SURNAME)
-            'Email' = $student.E_MAIL
+            'Victorian Australian Student Number' = $student.VSN
+            'First Name' = $student.FIRST_NAME
+            'Last Name' = $student.SURNAME
+            'Year Level' = $student.SCHOOL_YEAR
+            'Gender' = $student.GENDER
+            'Date of Birth' = $student.BIRTHDATE
+            'Classroom' = $student.E_MAIL
+            'Teacher1 First Name' = $currentTeacher.FIRST_NAME
+            'Teacher1 Last Name' = $currentTeacher.SURNAME
+            'Teacher1 Email' = $currentTeacher.E_MAIL
+            'Teacher2 First Name' = ""
+            'Teacher2 Last Name' = ""
+            'Teacher2 Email' = ""
          }
          
+        # Add secondary Teacher if they exist
+        if (-not [string]::IsNullOrWhiteSpace(($classes | Where-Object KGCKEY -eq $student.HOME_GROUP).TEACHER_B))
+        {
+           $tempTeach = $null
+           $tempTeach = $staff | Where-Object SFKEY -eq ($classes | Where-Object KGCKEY -eq $student.HOME_GROUP).TEACHER_B
+           $tempObject.'Teacher2 First Name' = $tempTeach.FIRST_NAME
+           $tempObject.'Teacher2 Last Name' = $tempTeach.SURNAME
+           $tempObject.'Teacher2 Email' = $tempTeach.E_MAIL
+           $tempTeach = $null
+        }
 
          #add the temporary object to the output array and clear the temporary object
          $studentOutput += $tempObject
@@ -292,7 +329,6 @@ if ($studentOutput.Count -eq 0)
 }
 else 
 {
-    $classes | Select-Object DESCRIPTION,TEXTBOOK,CURRICULUM,GRADE,STATUS |Export-Csv -Path "$fileOutputLocation\MathSpace-Classes-$(if ($nextYear -eq $false) { Get-Date -Format "yyyy" } else {[int](Get-Date -Format "yyyy") +1 }).csv" -Force -Encoding $exportFormat -NoTypeInformation
-    $staffOutput | Export-Csv -Path "$fileOutputLocation\MathSpace-Staff-$(if ($nextYear -eq $false) { Get-Date -Format "yyyy" } else {[int](Get-Date -Format "yyyy") +1 }).csv" -Force -Encoding $exportFormat -NoTypeInformation
-    $studentOutput | Export-Csv -Path "$fileOutputLocation\MathSpace-Students-$(if ($nextYear -eq $false) { Get-Date -Format "yyyy" } else {[int](Get-Date -Format "yyyy") +1 }).csv" -Force -Encoding $exportFormat -NoTypeInformation
+    $staffOutput | Where-Object {[string]::IsNullOrWhiteSpace($_.'Staff Email') -eq $false} | Export-Csv -Path "$fileOutputLocation\Elastik-Staff-$(if ($nextYear -eq $false) { Get-Date -Format "yyyy" } else {[int](Get-Date -Format "yyyy") +1 }).csv" -Force -Encoding $exportFormat -NoTypeInformation
+    $studentOutput | Export-Csv -Path "$fileOutputLocation\Elastik-Students-$(if ($nextYear -eq $false) { Get-Date -Format "yyyy" } else {[int](Get-Date -Format "yyyy") +1 }).csv" -Force -Encoding $exportFormat -NoTypeInformation
 }

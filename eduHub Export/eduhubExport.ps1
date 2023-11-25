@@ -97,11 +97,12 @@ $fieldsST = @(
                     'CONTACT_A'
                     'GENDER'
                     'MOBILE'
-                    'KOORIE'
-                    'DISABILITY'
-                    'ED_ALLOW'
-                    'LOTE_HOME_CODE'
-                    'ENG_SPEAK'
+                    'KOORIE'        #Required for OnDemand
+                    'DISABILITY'    #Required for OnDemand
+                    'ED_ALLOW'      #Required for OnDemand
+                    'LOTE_HOME_CODE'#Required for OnDemand
+                    'ENG_SPEAK'     #Required for OnDemand
+                    'VSN'           #Required for Elastik
                     'LW_DATE'
 )
 
