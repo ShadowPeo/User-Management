@@ -8,7 +8,7 @@ param
         [boolean]$includeDeltas = $true, #Include eduHub Delta File
 
         #File Locations
-        [string]$fileImportLocation = "$PSScriptRoot\EduHub",
+        [string]$fileImportLocation = "$PSScriptRoot\eduHub",
         [string]$fileOutputLocation = "$PSScriptRoot\Output",
         [string]$fileStafManualMatch = "$PSScriptRoot\Config\manualMatch.csv",
         [string]$filesToProcess = "ST|SF|DF|KGC|KCY|UM",
