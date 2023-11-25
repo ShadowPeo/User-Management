@@ -2,7 +2,7 @@ param
     (
         
         #School Details
-        [string]$schoolNumber = "3432", # Used for export and for import if using CASES File Names, TODO: Add code to pull from server name/bbportal
+        [string]$schoolNumber = "<<SCHOOL_NUMBER>>", # Used for export and for import if using CASES File Names, TODO: Add code to pull from server name/bbportal
 
         #File Locations
         [string]$fileImportLocation = "$PSScriptRoot\..\eduHub Export\Output",
