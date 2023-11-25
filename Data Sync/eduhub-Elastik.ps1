@@ -15,8 +15,6 @@ param
         [bool]$usePrefNameStudents = $false,
         [bool]$usePrefNameStaff = $true,
         [bool]$validateEmailInAD = $true,
-        [int]$gradeLowest = 3,
-        [int]$gradeHighest = 6,
 
         #Log File Info
         [string]$logPath = "$PSScriptRoot\Logs",
