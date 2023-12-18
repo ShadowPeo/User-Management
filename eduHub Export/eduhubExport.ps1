@@ -11,7 +11,7 @@ param
         [string]$fileImportLocation = "$PSScriptRoot\eduHub",
         [string]$fileOutputLocation = "$PSScriptRoot\Output",
         [string]$fileStafManualMatch = "$PSScriptRoot\Config\manualMatch.csv",
-        [string]$filesToProcess = "ST|SF|DF|KGC|KCY|UM",
+        $filesToProcess = "ST|SF|DF|KGC|KCY|UM",
 
         #Processing Handling Varialbles
         [float]$handlingStudentNoExportAfter = 365, #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left students, -1 will always export them

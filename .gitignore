@@ -2,3 +2,12 @@ eduHub Export/Config/manualMatch.csv
 eduHub Export/eduHub/*
 eduHub Export/Output/*
 Data Sync/Output/*
+eduSync-IgnoredUsers.csv
+EDU002 Groups.csv
+EDU001 Groups.csv
+CasesStaff-NEWFORM.csv
+Data Sync/Modules/ClassCreator-FullSchool.csv
+Data Sync/ClassCreator.csv
+Locations for groups.xlsx
+eduHubGroups.ps1
+.vscode/launch.json

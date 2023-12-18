@@ -14,8 +14,6 @@ param
         [string]$exportFormat = "utf8", #Formats supported for output ascii, unicode, utf8, utf32
         [bool]$nextYear = $false,
         [bool]$usePrefName = $false,
-        [string]$defaultPasssword = $null, #Sets Default Password to this
-        
 
         #Log File Info
         [string]$logPath = "$PSScriptRoot\Logs",
@@ -71,20 +69,10 @@ $ErrorActionPreference = "SilentlyContinue"
 $fieldsST = @(
                     'STKEY'
                     'SURNAME'
-                    'SECOND_NAME'
                     'FIRST_NAME'
                     'PREF_NAME'
-                    'BIRTHDATE'
-                    'STATUS'
-                    'EXIT_DATE'
-                    'YEAR_LEVEL'
-                    'SCHOOL_YEAR'
                     'HOME_GROUP'
                     'NEXT_HG'
-                    'GENDER'
-                    'LW_DATE'
-                    'PASSWORD'
-                    'TAGS'
 )
 
 #-----------------------------------------------------------[Functions]------------------------------------------------------------
@@ -150,14 +138,8 @@ if (Test-Path -Path ("$fileImportLocation\ST_$schoolNumber.csv"))
     
     $students = $students | Where-Object{$_.STATUS -ne "LEFT" -and $_.STATUS -ne "INAC"} | Select-Object $fieldsST | Sort-Object STKEY
 
-
-
     ForEach ($student in $students)
     {
-        #Set Birthdate to match format required explicitly
-        $student.BIRTHDATE = ($student.BIRTHDATE).SubString(0,($student.BIRTHDATE).IndexOf(" "))
-        $student.BIRTHDATE = (Get-Date $student.BIRTHDATE -Format "dd/MM/yyyy")
-        
         #Handle setting user to prefered name if this is what is desired
         if ($usePrefName -and (-not ([string]::IsNullOrWhiteSpace($student.PREF_NAME)) -and ($student.FIRST_NAME -ne $student.PREF_NAME)))
         {
@@ -165,49 +147,10 @@ if (Test-Path -Path ("$fileImportLocation\ST_$schoolNumber.csv"))
             Write-Host "Setting user $($student.STKEY) to use prefered name of $($student.PREF_NAME)"
         }
 
-        #Set Student Gender Correctly
-        if ($student.GENDER -ieq "M")
-        {
-            $student.GENDER = "male"
-        }
-        elseif ($student.GENDER -ieq "F")
-        {
-            $student.GENDER = "female"
-        }
-        else {
-            $student.GENDER = "Gender X"
-        }
-
         if ($nextYear -and -not $fileClassCreator)
         {
             #Set Students homegroup to next years homegroup
             $student.HOME_GROUP = $student.NEXT_HG
-
-            #Set Students School Year to next years school year
-            if ($student.SCHOOL_YEAR -eq 12 -or $student.SCHOOL_YEAR -eq 13)
-            {
-                $student.YEAR_LEVEL = "Year $($student.SCHOOL_YEAR = 12)"
-            }
-            else {
-                $student.YEAR_LEVEL = $student.SCHOOL_YEAR = "Year $($student.SCHOOL_YEAR + 1)"
-            }
-            $student.SCHOOL_YEAR = (Get-Date (Get-Date).AddYears(1) -Format "yyyy")
-        }
-        elseif ($fileClassCreator)
-        {
-            $student.YEAR_LEVEL = "Year $($student.SCHOOL_YEAR)"
-            $student.SCHOOL_YEAR = (Get-Date (Get-Date).AddYears(1) -Format "yyyy")
-        }
-        else {
-            $student.YEAR_LEVEL = "Year $($student.SCHOOL_YEAR)"
-            $student.SCHOOL_YEAR = (Get-Date -Format "yyyy")
-        }
-
-        $student.TAGS = $student.HOME_GROUP
-
-        if (-not [string]::IsNullOrWhiteSpace($defaultPasssword))
-        {
-            $student.PASSWORD = $defaultPasssword
         }
     }
     
@@ -236,6 +179,6 @@ if ($students.Count -eq 0)
 }
 else 
 {
-    $students  | Select-Object  @{Name = 'Family name'; Expression = {$_.SURNAME}},@{Name = 'Given name'; Expression = {$_.FIRST_NAME}},@{Name = 'Middle names'; Expression = {$_.SECOND_NAME}},@{Name = 'Username'; Expression = {$_.STKEY}},@{Name = 'Password'; Expression = {$_.PASSWORD}},@{Name = 'Date of birth (DD-MM-YYYY)'; Expression = {$_.BIRTHDATE}},@{Name = 'Gender'; Expression = {$_.GENDER}},@{Name = 'Tags'; Expression = {$_.TAGS}},@{Name = 'Unique ID'; Expression = {$_.UNIQUE_ID}},@{Name = 'Year level'; Expression = {$_.YEAR_LEVEL}},@{Name = 'School year'; Expression = {$_.SCHOOL_YEAR}} | Sort-Object 'Year Level', 'Tags','Username' | Export-Csv -Path "$fileOutputLocation\ACER-OARS-$(if ($nextYear -eq $false -and $fileClassCreator -ne $true) { Get-Date -Format "yyyy" } else {[int](Get-Date -Format "yyyy") +1 }).csv" -Force -Encoding $exportFormat -NoTypeInformation
+    $students  | Select-Object  @{Name = 'First Name'; Expression = {$_.FIRST_NAME}},@{Name = 'Last Name'; Expression = {$_.SURNAME}},@{Name = 'Student ID'; Expression = {$_.STKEY}},@{Name = 'Rollover Class 1'; Expression = {$_.HOME_GROUP}} | Sort-Object 'Year Level', 'Tags','Username' | Export-Csv -Path "$fileOutputLocation\Essential Assessment-$(if ($nextYear -eq $false -and $fileClassCreator -ne $true) { Get-Date -Format "yyyy" } else {[int](Get-Date -Format "yyyy") +1 }).csv" -Force -Encoding $exportFormat -NoTypeInformation
 }
 

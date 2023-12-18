@@ -7,14 +7,17 @@ param
         #File Locations
         [string]$fileImportLocation = "$PSScriptRoot\..\eduHub Export\Output",
         [string]$fileOutputLocation = "$PSScriptRoot\Output",
+        [string]$fileClassCreator = $null, #Class Creator File if using Class Creator
 
         #Processing Handling Varialbles
         [float]$handlingStudentNoExportAfter = 365, #How long to export the data after the staff member or student has left. this is calculated based upon Exit Date, if it does not exist but marked as left they will be exported until exit date is established; 0 Disables export of left students, -1 will always export them
         [string]$exportFormat = "utf8", #Formats supported for output ascii, unicode, utf8, utf32
         [bool]$nextYear = $false,
         [bool]$usePrefNameStudents = $false,
-        [bool]$usePrefNameStaff = $true,
+        [bool]$usePrefNameStaff = $false,
         [bool]$validateEmailInAD = $true,
+        [int]$gradeLowest = 0,
+        [int]$gradeHighest = 6,
 
         #Log File Info
         [string]$logPath = "$PSScriptRoot\Logs",
@@ -88,6 +91,7 @@ $fieldsSF = @(
                     'SURNAME'
                     'PREF_NAME'
                     'E_MAIL'
+                    'STAFF_STATUS'
                 )
 
 $fieldsKGC = @(
@@ -128,7 +132,7 @@ if (-not (Test-Path -Path  $logPath))
 {
     New-Item $logPath -ItemType Directory | Out-Null
 }
-
+$fileClassCreatorFound = $false
 $staff = $null
 $adUsers = $null
 if ($validateEmailInAD)
@@ -139,7 +143,7 @@ if ($validateEmailInAD)
 if (Test-Path -Path ("$fileImportLocation\SF_$schoolNumber.csv"))
 {
     Write-Log "SF File Exists, Importing"
-    $staff = Import-CSV -Path "$fileImportLocation\SF_$schoolNumber.csv" -Delimiter "," | Where-Object { $_.STAFF_STATUS -ne "LEFT" -and $_.STAFF_STATUS -ne "INAC"} | Select-Object $fieldsSF | Sort-Object SFKEY
+    $staff = Import-CSV -Path "$fileImportLocation\SF_$schoolNumber.csv" -Delimiter ","  | Select-Object $fieldsSF | Sort-Object SFKEY
     foreach ($staffMember in $staff)
     {
         #Handle setting user to prefered name if this is what is desired
@@ -164,18 +168,44 @@ else
 
 $classes = $null
 $staffOutput = @()
-#Get Year to Output
-$outputYear = (Get-Date -Format "yyyy")
 
 if (Test-Path -Path ("$fileImportLocation\KGC_$schoolNumber.csv"))
 {
     Write-Log "KGC File Exists, Importing"
-    $classes = Import-CSV -Path "$fileImportLocation\KGC_$schoolNumber.csv" -Delimiter "," | Where-Object {$_.ACTIVE -eq "Y"} | Select-Object $fieldsKGC | Sort-Object KGCKEY
+    if (-not [string]::IsNullOrWhiteSpace($fileClassCreator))
+    {
+        if (Test-Path -Path "$PSScriptRoot/Modules/ClassCreator.ps1" -PathType Leaf)
+        {
+            Write-Log "Importing ClassCreator Module"
+            Import-Module "$PSScriptRoot/Modules/ClassCreator.ps1" -Force
+        }
+        else {
+            Write-Log "Class Creator Module not found, please ensure it exists"
+            Exit
+        }
+
+        if (Test-Path -Path $fileClassCreator -PathType Leaf)
+        {
+            Write-Log "Merging Class Creator File"
+            $classes = Sync-ClassCreatorClasses -classes (Import-CSV -Path "$fileImportLocation\KGC_$schoolNumber.csv" -Delimiter ",") -classCreator (Import-CSV -Path "$fileClassCreator" -Delimiter ",") -staff (Import-CSV -Path "$fileImportLocation\SF_$schoolNumber.csv" -Delimiter ",")
+            $fileClassCreatorFound = $true
+        }
+        else 
+        {
+            Write-Log "Class Creator File not found, continuing without it"
+            $classes = Import-CSV -Path "$fileImportLocation\KGC_$schoolNumber.csv" -Delimiter ","        
+        }
+    }
+    else {
+        Write-Log "Importing Classes File"
+        $classes = Import-CSV -Path "$fileImportLocation\KGC_$schoolNumber.csv" -Delimiter ","
+    }
+    
+    $classes = $classes | Where-Object {$_.ACTIVE -eq "Y"} | Select-Object $fieldsKGC | Sort-Object KGCKEY
+    
     foreach($class in $classes)
     {
-        $class.DESCRIPTION = "$outputYear - Class $($class.KGCKEY)"
-        $class.TEXTBOOK = "Victorian Curriculum Year $(($class.KGCKEY).SubString(1,1)) - 2021 Edition"
-        $class.CURRICULUM = "Victorian Curriculum"
+        $class.DESCRIPTION = "Class $($class.KGCKEY)"
         $class.GRADE = "Year $(($class.KGCKEY).SubString(1,1))"
 
         $tempObject = $null
@@ -187,7 +217,7 @@ if (Test-Path -Path ("$fileImportLocation\KGC_$schoolNumber.csv"))
                 "Staff First Name" = $tempStaff.FIRST_NAME
                 "Staff Last Name" = $tempStaff.SURNAME
                 "Staff Email" = $tempStaff.E_MAIL
-                "Classroom" = "$outputYear - Class $($class.KGCKEY)"
+                "Classroom" = "Class $($class.KGCKEY)"
             }
             $tempStaff = $null
         }
@@ -201,7 +231,7 @@ if (Test-Path -Path ("$fileImportLocation\KGC_$schoolNumber.csv"))
                 "Staff First Name" = $tempStaff.FIRST_NAME
                 "Staff Last Name" = $tempStaff.SURNAME
                 "Staff Email" = $tempStaff.E_MAIL
-                "Classroom" = "$outputYear - Class $($class.KGCKEY)"
+                "Classroom" = "Class $($class.KGCKEY)"
             }
             $tempStaff = $null
         }
@@ -217,6 +247,14 @@ else
     Exit
 }
 
+foreach ($staffMember in $staff | Where-Object { $_.STAFF_STATUS -eq "LEFT" -or $_.STAFF_STATUS -eq "INAC"})
+{
+    if ($staffOutput.'Staff Email' -contains $staffMember.E_MAIL)
+    {
+        $staffMember.STAFF_STATUS = "ACTV"
+    }
+}
+
 foreach($staffMember in ($staff | Where-Object { $_.STAFF_STATUS -ne "LEFT" -and $_.STAFF_STATUS -ne "INAC" -and ($staffOutput."Staff Email" -notcontains $_.E_MAIL)}))
 {
     $tempObject = [PSCustomObject]@{
@@ -228,7 +266,6 @@ foreach($staffMember in ($staff | Where-Object { $_.STAFF_STATUS -ne "LEFT" -and
     $staffOutput += $tempObject
 }
 
-
 #Blank Current Teacher Variable
 $currentTeacher = $null
 
@@ -237,8 +274,38 @@ $studentOutput = @()
 
 if (Test-Path -Path ("$fileImportLocation\ST_$schoolNumber.csv"))
 {
-    Write-Log "ST File Exists, Importing"
-    $students = Import-CSV -Path "$fileImportLocation\ST_$schoolNumber.csv" -Delimiter "," | Where-Object{(-not [string]::IsNullOrWhiteSpace($_.VSN) -and $_.VSN -ne "UNKNOWN") -and $_.STATUS -ne "LEFT" -and $_.STATUS -ne "INAC"  -and ([int]$_.SCHOOL_YEAR -ge $gradeLowest -and [int]$_.SCHOOL_YEAR -le $gradeHighest)} | Select-Object $fieldsST | Sort-Object STKEY
+    Write-Log "ST File Exists"
+    $students = $null
+    if (-not [string]::IsNullOrWhiteSpace($fileClassCreator))
+    {
+        if (Test-Path -Path "$PSScriptRoot/Modules/ClassCreator.ps1" -PathType Leaf)
+        {
+            Write-Log "Importing ClassCreator Module"
+            Import-Module "$PSScriptRoot/Modules/ClassCreator.ps1" -Force
+        }
+        else {
+            Write-Log "Class Creator Module not found, please ensure it exists"
+            Exit
+        }
+
+        if (Test-Path -Path $fileClassCreator -PathType Leaf)
+        {
+            Write-Log "Merging Class Creator File"
+            $students = Sync-ClassCreatorStudents -students (Import-CSV -Path "$fileImportLocation\ST_$schoolNumber.csv" -Delimiter ",") -classCreator (Import-CSV -Path "$fileClassCreator" -Delimiter ",")    
+            $fileClassCreatorFound = $true
+        }
+        else 
+        {
+            Write-Log "Class Creator File not found, continuing without it"
+            $students = Import-CSV -Path "$fileImportLocation\ST_$schoolNumber.csv" -Delimiter ","        
+        }
+    }
+    else {
+        Write-Log "Importing Students File"
+        $students = Import-CSV -Path "$fileImportLocation\ST_$schoolNumber.csv" -Delimiter ","
+    }
+    
+    $students = $students | Where-Object {(-not [string]::IsNullOrWhiteSpace($_.VSN) -and $_.VSN -ne "UNKNOWN") -and $_.STATUS -ne "LEFT" -and $_.STATUS -ne "INAC"  -and ([int]$_.SCHOOL_YEAR -ge $gradeLowest -and [int]$_.SCHOOL_YEAR -le $gradeHighest)} | Select-Object $fieldsST | Sort-Object STKEY
 
     foreach ($student in ($students | Sort-Object HOME_GROUP,SCHOOL_YEAR,STKEY))
     {
@@ -297,7 +364,6 @@ if (Test-Path -Path ("$fileImportLocation\ST_$schoolNumber.csv"))
 
         
     }
-    
 }
 else 
 {
@@ -318,8 +384,6 @@ if (-not (Test-Path $fileOutputLocation))
 {
     New-Item -Path $fileOutputLocation -ItemType Directory | Out-Null
 }
-
-
 if ($studentOutput.Count -eq 0)
 {
     Write-Log "No Students to Export - Perhaps no homegroups set and trying to do a next year export"
@@ -327,6 +391,6 @@ if ($studentOutput.Count -eq 0)
 }
 else 
 {
-    $staffOutput | Where-Object {[string]::IsNullOrWhiteSpace($_.'Staff Email') -eq $false} | Export-Csv -Path "$fileOutputLocation\Elastik-Staff-$(if ($nextYear -eq $false) { Get-Date -Format "yyyy" } else {[int](Get-Date -Format "yyyy") +1 }).csv" -Force -Encoding $exportFormat -NoTypeInformation
-    $studentOutput | Export-Csv -Path "$fileOutputLocation\Elastik-Students-$(if ($nextYear -eq $false) { Get-Date -Format "yyyy" } else {[int](Get-Date -Format "yyyy") +1 }).csv" -Force -Encoding $exportFormat -NoTypeInformation
+    $staffOutput | Where-Object {([string]::IsNullOrWhiteSpace($_.'Staff Email') -eq $false)} | Export-Csv -Path "$fileOutputLocation\Elastik-Staff-$(if ($nextYear -eq $false -and $fileCLassCreatorFound -ne $true) { Get-Date -Format "yyyy" } else {[int](Get-Date -Format "yyyy") +1 }).csv" -Force -Encoding $exportFormat -NoTypeInformation
+    $studentOutput | Export-Csv -Path "$fileOutputLocation\Elastik-Students-$(if ($nextYear -eq $false -and $fileClassCreatorFound -ne $true) { Get-Date -Format "yyyy" } else {[int](Get-Date -Format "yyyy") +1 }).csv" -Force -Encoding $exportFormat -NoTypeInformation
 }
